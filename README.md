@@ -9,7 +9,7 @@ These are repos with instructions to easily explore the tools.
 
 ##### **NOTE: Please be aware that not all examples provided here were created within Made Tech**.
 
-- Prefect: toy single container example (TODO: create as repo and link here)
+- [Prefect: toy single container example](https://github.com/madetech/prefect_exploration_toy_example)
 - [Prefect: multi-container example](https://github.com/fraibacas/prefect-orion)
 
 ## Collaborating
