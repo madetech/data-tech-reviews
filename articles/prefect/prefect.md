@@ -9,7 +9,7 @@ Prefect is a Python framework for tasks/pipelines orchestration. It's main selli
 - Little additional effort in writing code using the framework
 - WebUI for pipeline monitoring, logging and alerting
 - Is script based and integrates well with version control services (Github, Gitlab, etc)
-- Having a good amount of ex-airflow developers in the community, it addresses several areas where Airflow is either showing its age or where commonly the framework or concepts add extra hassle to get things done. NoteL a interesting blog about this can be found here: https://medium.com/the-prefect-blog/why-not-airflow-4cfa423299c4
+- Having a good amount of ex-airflow developers in the community, it addresses several areas where Airflow is either showing its age or where commonly the framework or concepts add extra hassle to get things done. Note: an interesting blog about this can be found here: https://medium.com/the-prefect-blog/why-not-airflow-4cfa423299c4
 
 What were the main drives that led to Prefect version 2:
 - some of the concepts were reviewed to make the tool more intuitive
@@ -112,10 +112,12 @@ An example of what a Kubernetes scalable deployment could look like: ![](prefect
 -------------
 
 ## Working examples:
- 1) a very basic deployment in a single container can be found in the zipped_examples:
-	 - prefect_toy_single_container_example.zip
- 1) a docker-compose example using a more realistic setup can be found in the zipped examples: 
-	 - prefect_with_docker_compose_example.zip
+ 
+ 1) a very basic deployment in a single container can be found here:
+[Prefect: toy single container example](https://github.com/madetech/prefect_exploration_toy_example)
+	 
+ 1) a docker-compose example using a more realistic setup can be found here: 
+[Prefect: multi-container example](https://github.com/fraibacas/prefect-orion)
 
 -------------
 
