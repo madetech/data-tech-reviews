@@ -1,15 +1,71 @@
 # Prefect
 
 ## Brief description
-Prefect is a Python framework for tasks/pipelines orchestration. The main changes with the version 2.0 were:
+Prefect is a Python framework for tasks/pipelines orchestration. It's main advantages selling points are:
+- The setup can be as simple or as complex as needed, adapting to the needs of the work that it will orchestrate, for example: 
+	- can be run in a single machine for very simple use cases
+	- can be deployed as a robust service in a kubernetes cluster and trigger serverless cloud compute in most public clouds to process big data tasks
+- Main concepts are very intuitive and easy to start using
+- Little additional effort in writing code using the framework
+- WebUI for pipeline monitoring, logging and alerting
+- Is script based and integrates well with version control services (Github, Gitlab, etc)
+- Having a good amount of ex-airflow developers in the community, it addresses several areas where Airflow is either showing its age or areas commonly the framework or concepts add extra hassle to get things done. NoteL a interesting blog about this can be found here: https://medium.com/the-prefect-blog/why-not-airflow-4cfa423299c4
+
+What were the main drives that led to Prefect version 2:
 - some of the concepts were reviewed to make the tool more intuitive
-- a broader range of use cases was covered
+- a broader range of use cases is now covered
 - all functionality is now available in the open source / community version.
+
+Which tools in the market deliver similar functionality to Prefect?
+- Airflow
+- Azure Data Factory
+- AWS Step Functions
+- Matilion
 
 -------------
 
 ## Licensing / pricing model
 Open-source version available can be run locally or on any infrastructure of choice (e.g., Docker, Kubernetes). There is a paid cloud hosted version that offers the orchestration server as managed service, with a ready to use access control feature. 
+
+-------------
+
+## Comparing with other orchestration tools
+
+### Prefect x Airflow
+
+- Starting to use Prefect feels simpler and more intuitive than Airflow. 
+- Turning existing python code into workflows can be done with very little refactoring.
+- Workflows can do nearly everything a python function can, which means they are not limited to directed acyclic processes and can easily exchange results between them (python returned data or objects).
+- Prefect workflows can be triggered off-schedule (including starting more than one of the same flow in parallel and with the same start time) 
+- Logs for flow runs are maintained even if never scheduled and just run manually.
+- Dates: In prefect the schedule date is the flow start date (very intuitive), which is different from Airflow's confusing concept of "_end of an interval_ capped by the DAG’s start time".
+- Prefects architecture is more modern and allows for more fully integrating with parallel processing and distributed systems. For example:
+	- the tasks are scheduled by the flow runner and not by a centralised scheduler. 
+	- Logs are written to the database also by runners instead of centralised. 
+- This reduces bottleneck and allows to fully use potential of the workers infra-structure (for example, if using a Dask Cluster as runner one can benefit from millisecond scheduler)
+- Both Airflow and Prefect can be used either as a pure orchestration tool or "orchestration + processing" tool depending on your needs and complexity of your architecture.
+- Prefect doesn't have the equivalent of Airflow sensors, to make an event driven processing setup you can trigger runs via the prefect API.
+- The Prefect web UI of the open source version doesn't come with an user access control interface ready to use (the cloud paid version does).
+
+### Prefect x Azure Data Factory x AWS Step functions
+
+- Prefect is a code-oriented orchestration tool, while Data Factory and Step Functions are no-code orchestration tools where the user builds their workflows via a visual interface.
+- They are provided as cloud services specific to their respective vendors (ADF from Microsoft, and Step functions from AWS) and will require a complete rewrite of the workflows to another tool if moving between cloud providers is desired.
+- The more usual setup for Step Functions is to have it as an orchestration tool, calling other services to do the processing (AWS lambda, AWS glue, etc).
+- Data factory is also mostly used for orchestration only calling other services to process and transform data (Databricks, Azure Functions, Synapse, etc). In addition to these, ADF has its own managed spark processing engine (ADF Data Flow) that provides a low-code interface for most data processing transformations with easy integration.
+
+When ADF or Step functions can be your preferred option instead of Prefect:
+- both integrate more easily with all other services offered by their respective cloud providers. 
+- very little maintenance because they are provided as services (saving the user from any infrastructure maintenance work)
+- pipelines can be built and scheduled via No Code drag and drop UI instead of code.
+
+### Prefect x Matilion
+
+- Matilion is similar to Data Factory and Step functions in the fact that it provides a no-code visual interface to build workflows. 
+- Its main focus is orchestrating data workflows. The usual setup is to have it deployed on top of a data warehouse solution (redshift, big query, delta lake, etc) to schedule and orchestrate pipelines processed by the warehouse engine.
+- The matilion service can be run in different clouds and infrastructure (which makes it more portable than ADF and Step Functions). 
+- The workflows can be version controlled and integrated to a git repository.
+- If the processing engine used is proprietary and/or cloud specific (redshift, big query, etc) it may be rather complex to move between clouds.
 
 -------------
 
@@ -60,61 +116,6 @@ An example of what a Kubernetes scalable deployment could look like: ![](prefect
 	 - prefect_toy_single_container_example.zip
  1) a docker-compose example using a more realistic setup can be found in the zipped examples: 
 	 - prefect_with_docker_compose_example.zip
-
--------------
-
-## Comparing with other orchestration tools
-
-### Prefect x Airflow
-
-Starting to use Prefect feels simpler and more intuitive than Airflow. 
-
-Turning existing python code into workflows can be done with very little refactoring.
-
-Workflows can do nearly everything a python function can, which means they are not limited to directed acyclic processes and can easily exchange results between them (python returned data or objects).
-
-Prefect workflows can be triggered off-schedule (including starting more than one of the same flow in parallel and with the same start time) 
-
-Logs for flow runs are maintained even if never scheduled and just run manually.
-
-Dates: In prefect the schedule date is the flow start date (very intuitive), which is different from Airflow's confusing concept of "_end of an interval_ capped by the DAG’s start time".
-
-Prefects architecture is more modern and allows for more fully integrating with parallel processing and distributed systems. For example:
-- the tasks are scheduled by the flow runner and not by a centralised scheduler. 
-- Logs are written to the database also by runners instead of centralised. 
-This reduces bottleneck and allows to fully use potential of the workers infra-structure (for example, if using a Dask Cluster as runner one can benefit from millisecond scheduler)
-
-Both Airflow and Prefect can be used either as a pure orchestration tool or "orchestration + processing" tool depending on your needs and complexity of your architecture.
-
-Prefect doesn't have the equivalent of Airflow sensors, to make an event driven processing setup you can trigger runs via the prefect API.
-
-The Prefect web UI of the open source version doesn't come with an user access control interface ready to use (the cloud paid version does).
-
-### Prefect x Azure Data Factory x AWS Step functions
-
-Prefect is a code-oriented orchestration tool, while Data Factory and Step Functions are no-code orchestration tools where the user builds their workflows via a visual interface.
-
-They are provided as cloud services specific to their respective vendors (ADF from Microsoft, and Step functions from AWS) and will require a complete rewrite of the workflows to another tool if moving between cloud providers is desired.
-
-The more usual setup for Step Functions is to have it as an orchestration tool, calling other services to do the processing (AWS lambda, AWS glue, etc).
-
-Data factory is also mostly used for orchestration only calling other services to process and transform data (Databricks, Azure Functions, Synapse, etc). In addition to these, ADF has its own managed spark processing engine (ADF Data Flow) that provides a low-code interface for most data processing transformations with easy integration.
-
-Their main advantages are:
-- both integrate very easily with all other services offered by their respective cloud providers. 
-- very little maintenance because they are provided as services (saving the user from any infrastructure maintenance work)
-
-### Prefect x Matilion
-
-Matilion is similar to Data Factory and Step functions in the fact that it provides a no-code visual interface to build workflows. 
-
-Its main focus is orchestrating data workflows. The usual setup is to have it deployed on top of a data warehouse solution (redshift, big query, delta lake, etc) to schedule and orchestrate pipelines processed by the warehouse engine.
-
-The matilion service can be run in different clouds and infrastructure (which makes it more portable than ADF and Step Functions). 
-
-The workflows can be version controlled and integrated to a git repository.
-
-If the processing engine used is proprietary and/or cloud specific (redshift, big query, etc) it may be rather complex to move between clouds.
 
 -------------
 

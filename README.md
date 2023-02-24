@@ -1,7 +1,7 @@
 # Data Tech Reviews
 
 ## Articles
-- [Prefect](/articles/prefect/prefect.md) (last reviewed Oct/2022)
+- [Prefect](/articles/prefect/prefect.md) (last reviewed Feb/2023)
 - [Data Lakehouse Architecture](/articles/data_lakehouse_architecture/data_lakehouse_architecture.md)  (last reviewed Feb/2023)
 
 ## Quick Exploration Packs
