@@ -1,7 +1,7 @@
 # Prefect
 
 ## Brief description
-Prefect is a Python framework for tasks/pipelines orchestration. It's main advantages selling points are:
+Prefect is a Python framework for tasks/pipelines orchestration. It's main selling points are:
 - The setup can be as simple or as complex as needed, adapting to the needs of the work that it will orchestrate, for example: 
 	- can be run in a single machine for very simple use cases
 	- can be deployed as a robust service in a kubernetes cluster and trigger serverless cloud compute in most public clouds to process big data tasks
