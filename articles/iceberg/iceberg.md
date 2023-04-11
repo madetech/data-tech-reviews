@@ -4,32 +4,82 @@
 
 > Iceberg is a high-performance format for huge analytic tables. Iceberg brings the reliability and simplicity of SQL tables to big data, while making it possible for engines like Spark, Trino, Flink, Presto, Hive and Impala to safely work with the same tables, at the same time.
 
-Essentially Iceberg has two components:
+Essentially Iceberg has three components, all versioned separately:
 * [Open format specification](https://iceberg.apache.org/spec/) for a table level persistence store
-* Java Reference implementation for interacting with the format specification, and integrating with processing engines (Spark, Flink & Hive)
+* Java API Layer & Reference implementation for interacting with the format specification, and integrating with processing engines (in-tree: Spark, Flink & Hive)
+* Python API layer & CLI to interact with the Catalog server (or its Glue/Hive/DynamoDB equivalent (?)), and direct querying of the metadata/data layers
 
-Other processing engines have their own out-of-tree integrations with Iceberg (Presto, Trino, Impala). Snowflake have released support for Iceberg Tables as a open-standard alternative to their proprietary table format to [public preview](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
-
+Other processing engines have their own out-of-tree integrations with Iceberg (AWS Glue, Presto, Trino, Impala). Snowflake have released support for Iceberg Tables as a open-standard alternative to their proprietary table format to [public preview](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
 
 ## Licensing / pricing model
 
-Originally developed by Netflix, donated to Apache Foundation. Released under the [Apache License 2.0](https://github.com/apache/iceberg/blob/master/LICENSE)
+Originally developed by Netflix, released to the public domain in 2017, donated to Apache Foundation in 2018. Released under the [Apache License 2.0](https://github.com/apache/iceberg/blob/master/LICENSE)
 
-## Comparison with other data lake filesystems
+## Project Maturity
 
-### Iceberg vs Delta
+#### Open Format Specification
 
-Iceberg
+Version 1 and 2 of the format specification have been completed and adopted by the community. The two releases see to be additive in scope.
+
+### Java Libraries
+
+Apache Iceberg v1.0 was released in November 2022.
+
+### Pyiceberg
+
+Pyiceberg is versioned separately despite being part of the Iceberg git repository, and is yet to have a major release (version 0.13 at time of writing).
+
+## What Are the Goals of Iceberg?
+
+#### Serializable isolation
+
+> Reads will be isolated from concurrent writes and always use a committed snapshot of a table’s data. Writes will support removing and adding files in a single operation and are never partially visible. Readers will not acquire locks.
+
+Essentially what this means is that Iceberg has two Isolation Levels for two seperate use cases, notions of transactionality Essentially
+
+> Speed – Operations will use O(1) remote calls to plan the files for a scan and not O(n) where n grows with the size of the table, like the number of partitions or files.
+> Scale – Job planning will be handled primarily by clients and not bottleneck on a central metadata store. Metadata will include information needed for cost-based optimization.
+> Evolution – Tables will support full schema and partition spec evolution. Schema evolution supports safe column add, drop, reorder and rename, including in nested structures.
+> Dependable types – Tables will provide well-defined and dependable support for a core set of types.
+> Storage separation – Partitioning will be table configuration. Reads will be planned using predicates on data values, not partition values. Tables will support evolving partition schemes.
+> Formats – Underlying data file formats will support identical schema evolution rules and types. Both read-optimized and write-optimized formats will be available.
+
+<!-- ### Format Specification -->
+
+#### Schema evolution
+    supports add, drop, update, or rename, and has no side-effects
+
+#### Hidden Paritioning
+    Hidden partitioning prevents user mistakes that cause silently incorrect results or extremely slow queries
+
+#### Parition Layout Evolution
+    Partition layout evolution can update the layout of a table as data volume or query patterns change
+
+#### Time Travel
+    Time travel enables reproducible queries that use exactly the same table snapshot, or lets users easily examine changes
+
+#### Version Rollback
+    Version rollback allows users to quickly correct problems by resetting tables to a good state
+
+<!-- ### Catalog -->
+
+### ACID transactions
+
+ACID transactionality seems to be provided via the Catalog implementation. How exactly this works for the use case of direct comm Apache Hive (which is provided via built in to Iceberg)
+
+### pyiceberg
 
 ## Main components
 
 ### Iceberg Table Specification
 
+In contrast, Iceberg was designed to run completely abstracted from physical storage using object storage. All locations are “explicit, immutable, and absolute” as defined in metadata
+
 * operating on top of a distributed file system with data stored in one of several open file formats (Avro, Parquet, and ORC) and metadata (Avro)
 
 They make a point of saying that the intended use case is for a large, but slow-changing dataset.
 
->...large, slow-changing collection of file sbuilt on open formats over a distributed filesystem or key-value store
+>...large, slow-changing collection of files built on open formats over a distributed filesystem or key-value store
 
 The envisioned architecture is detailed in the follow graphic ![Graphic detailing target architecture of Iceberg.](https://iceberg.apache.org/img/iceberg-metadata.png)
 
@@ -38,6 +88,29 @@ This graphic describes a single stateful service (Catalog) operating in (presuma
 Digging into this we can see that the state of the service is simply to hold a pointer to the latest table state in the form of a metadata file (swapped atomically)
 
 ### Catalog Service
+
+Iceberg supports a variety of Catalog implementations, the following have in-tree Java Service and pyiceberg client implementations:
+
+* Iceberg's native REST Catalog
+* JDBC Catalog
+* Hive Catalog
+* Spark Catalog
+* AWS Glue Catalog
+
+Additionally, pyiceberg includes support for working with out-of-tree catalog implementations:
+
+* DynamoDb Catalog
+
+
+## Integrations
+
+## Comparison with other data lake filesystems
+
+### Iceberg vs Delta
+
+Iceberg not at t
+
+Iceberg does have several features' delta is lacking. Iceberg supports concurrent writes to the same Delta table from multiple spark drivers natively, whereas Delta requires a [workaround using DynamoDB and explicit feature/version toggle on all LogStore writers](https://docs.delta.io/latest/delta-storage.html#-delta-storage-s3-multi-cluster)
 
 ## Starting simple
 
@@ -84,3 +157,5 @@ If we `docker-compose exec mc bash` and use the `mc` client to query the `s3` ob
 
 ## Reference
 
+* [Lakehouse Architecture with Iceberg and MinIO (by MinIO)](https://blog.min.io/lakehouse-architecture-iceberg-minio/)
+* [AWS Glue native Iceberg interface documentation](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-iceberg.html)
