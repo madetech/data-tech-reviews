@@ -1,5 +1,45 @@
 # Apache Iceberg
 
+<!-- vim-markdown-toc GFM -->
+
+    * [Brief description](#brief-description)
+    * [Licensing / pricing model](#licensing--pricing-model)
+    * [Project Maturity](#project-maturity)
+            * [Open Format Specification](#open-format-specification)
+        * [Java Libraries](#java-libraries)
+        * [Pyiceberg](#pyiceberg)
+    * [What Are the Goals of Iceberg?](#what-are-the-goals-of-iceberg)
+        * [Serializable isolation](#serializable-isolation)
+        * [Speed](#speed)
+        * [Scale](#scale)
+        * [Evolution](#evolution)
+        * [Dependable Types](#dependable-types)
+        * [Storage Separation](#storage-separation)
+        * [Formats](#formats)
+    * [Main components](#main-components)
+        * [Iceberg Table Specification](#iceberg-table-specification)
+        * [Catalog Service](#catalog-service)
+    * [Integrations](#integrations)
+    * [Comparison with other data lake filesystems](#comparison-with-other-data-lake-filesystems)
+        * [Iceberg vs Delta](#iceberg-vs-delta)
+            * [Maturity](#maturity)
+            * [Unique to Iceberg](#unique-to-iceberg)
+                * [Concurrent Writes to Same Table](#concurrent-writes-to-same-table)
+                * [Partition Layout Evolution](#partition-layout-evolution)
+            * [Common to Both](#common-to-both)
+                * [ACID transactions](#acid-transactions)
+            * [Time Travel](#time-travel)
+            * [Version Rollback](#version-rollback)
+            * [Unique to Delta](#unique-to-delta)
+    * [Starting simple](#starting-simple)
+    * [Scalable Production](#scalable-production)
+    * [Draft of a deployment design](#draft-of-a-deployment-design)
+    * [Working examples](#working-examples)
+    * [Core concepts](#core-concepts)
+    * [Reference](#reference)
+
+<!-- vim-markdown-toc -->
+
 ## Brief description
 
 > Iceberg is a high-performance format for huge analytic tables. Iceberg brings the reliability and simplicity of SQL tables to big data, while making it possible for engines like Spark, Trino, Flink, Presto, Hive and Impala to safely work with the same tables, at the same time.
@@ -31,51 +71,101 @@ Pyiceberg is versioned separately despite being part of the Iceberg git reposito
 
 ## What Are the Goals of Iceberg?
 
-#### Serializable isolation
+### Serializable isolation
 
 > Reads will be isolated from concurrent writes and always use a committed snapshot of a table’s data. Writes will support removing and adding files in a single operation and are never partially visible. Readers will not acquire locks.
 
-Essentially what this means is that Iceberg has two Isolation Levels for two seperate use cases, notions of transactionality Essentially
+Essentially what this means in practice is that, Iceberg supports writes to (immutable) files in the directory structure of the data layer without the contents being registered in the table entity. Iceberg terms this Optimistic Concurrency; any table data or metadata is created optimistically assuming that the current "version" will not be changed before that write is committed.
 
-> Speed – Operations will use O(1) remote calls to plan the files for a scan and not O(n) where n grows with the size of the table, like the number of partitions or files.
-> Scale – Job planning will be handled primarily by clients and not bottleneck on a central metadata store. Metadata will include information needed for cost-based optimization.
-> Evolution – Tables will support full schema and partition spec evolution. Schema evolution supports safe column add, drop, reorder and rename, including in nested structures.
-> Dependable types – Tables will provide well-defined and dependable support for a core set of types.
-> Storage separation – Partitioning will be table configuration. Reads will be planned using predicates on data values, not partition values. Tables will support evolving partition schemes.
-> Formats – Underlying data file formats will support identical schema evolution rules and types. Both read-optimized and write-optimized formats will be available.
+When the write is committed, the table state is changed (i.e. the new data files previously written are registered against the tables) a new (immutable) metadata file is created, and the pointer held by the catalog service is swapped atomically.
+
+> An atomic swap of one table metadata file for another provides the basis for serializable isolation. Readers use the snapshot that was current when they load the table metadata and are not affected by changes until they refresh and pick up a new metadata location.
+
+If the metadata (or specifically the list of snapshots, see the next section for more detail) is no longer concurrent (i.e. does not have the same state as the one fetched when the write began) at point of commit, the writer process must recalculate the new metadata state against the current version, and try to commit this change again. How difficult this is depends on the change being written, and the isolation level which it requires, and is out of scope of this article.
+
+### Speed
+
+> Operations will use O(1) remote calls to plan the files for a scan and not O(n) where n grows with the size of the table, like the number of partitions or files.
+
+The metadata files I mentioned earlier contain all metadata relating to the table schema, partitioning config, custom properties, and snapshots (i.e. table states) of the table contents. This means that a single source of truth is maintained for query planning.
+
+### Scale
+
+> Job planning will be handled primarily by clients and not bottleneck on a central metadata store. Metadata will include information needed for cost-based optimization.
+
+This point is already mostly covered with what I've said above; the metadata required for query planning is referenced by a pointer to a metadata file in the object store, the onus is on clients to use this for query planning before submission of the query to whatever distributed compute is available.
+
+### Evolution
+
+> Tables will support full schema and partition spec evolution. Schema evolution supports safe column add, drop, reorder and rename, including in nested structures.
+
+Schema in this context is the table schema, the names and types of field stored in a table. Importantly, the relationship between tables and schemas is one-to-many, i.e. a table is described by an iterable of schemas. When a new schema is added, this evolution process copies the previous schema, applies the changes, and adds this (immutable) schema to the list of schemas recorded against the table. This gives a full history of how the table structure has evolved over time.
+
+<!-- Exactly how you're allowed to change a schema seems fairly open, but there are notable exceptions. -->
+
+<!-- Valid schema evolutions are: -->
+<!-- * Type promotion (only when it increases field precision) -->
+<!-- * Field addition -->
+<!-- * Field rename -->
+<!-- * Field reordering -->
+<!-- * Field deletion -->
+
+<!-- Invalid schema evolutions are -->
+<!-- * Grouping of structs (nested -->
+<!-- Schema evolution is provided  -->
+
+See [Storage Separation](#storage-separation) for more information on partition evolution.
+
+### Dependable Types
+
+> Tables will provide well-defined and dependable support for a core set of types.
+
+Iceberg fields can be of primitive type (type wrapper around commonly used Avro/Parquet/Orc primitive types), or can be of struct type (immutable tuple of fields, think of it as a typed dict with metadata around default value/nullability/comments). Iceberg has its own types and its own mappings between these types and the types of the underlying (Avro/Parquet/ORC) representation.
+
+### Storage Separation
+
+> Partitioning will be table configuration. Reads will be planned using predicates on data values, not partition values. Tables will support evolving partition schemes.
+
+Partitions are referenced by the top-level table metadata entity (Iceberg calls this a Specification), which also refers to the schemas iterable I mentioned previously. Partitions are applied against a data file, and what's different about Icebergs approach to partitioning is that the partition can represent the result of a transform applied to the data, instead of being limited to the data itself. This can be used to store the result of common filter operations against the data to avoid recomputing.
+<!-- recomputing the values of common operations if that operation has a partition stored against its outputs.  -->
+
+These partition transforms can evolve with time to become more granular whilst still being applicable to the previous use case. The partitioning scheme of a table to be changed without requiring a rewrite of the table (though presumably the partition will have to be added for previously stored data).
+Queries can be optimised using multiple partitions schemes (data partitioned using different schemes will be planned separately to maximize performance).
+
+### Formats
+
+> Underlying data file formats will support identical schema evolution rules and types. Both read-optimized and write-optimized formats will be available.
+
+Iceberg operates on top of a distributed file system with data (Avro, Parquet & ORC) and metadata (Avro) stored in common open formats. Iceberg maps its own built-in types to theirs.
 
 <!-- ### Format Specification -->
 
-#### Schema evolution
-    supports add, drop, update, or rename, and has no side-effects
+<!-- ## -->
 
-#### Hidden Paritioning
-    Hidden partitioning prevents user mistakes that cause silently incorrect results or extremely slow queries
+<!-- #### Schema evolution -->
+<!--     supports add, drop, update, or rename, and has no side-effects -->
 
-#### Parition Layout Evolution
-    Partition layout evolution can update the layout of a table as data volume or query patterns change
+<!-- #### Hidden Paritioning -->
+<!--     Hidden partitioning prevents user mistakes that cause silently incorrect results or extremely slow queries -->
 
-#### Time Travel
-    Time travel enables reproducible queries that use exactly the same table snapshot, or lets users easily examine changes
+<!-- #### Parition Layout Evolution -->
+<!--     Partition layout evolution can update the layout of a table as data volume or query patterns change -->
 
-#### Version Rollback
-    Version rollback allows users to quickly correct problems by resetting tables to a good state
+<!-- #### Time Travel -->
+<!--     Time travel enables reproducible queries that use exactly the same table snapshot, or lets users easily examine changes -->
+
+<!-- #### Version Rollback -->
+<!--     Version rollback allows users to quickly correct problems by resetting tables to a good state -->
 
 <!-- ### Catalog -->
 
-### ACID transactions
-
-ACID transactionality seems to be provided via the Catalog implementation. How exactly this works for the use case of direct comm Apache Hive (which is provided via built in to Iceberg)
-
-### pyiceberg
+<!-- ### pyiceberg -->
 
 ## Main components
 
 ### Iceberg Table Specification
 
-In contrast, Iceberg was designed to run completely abstracted from physical storage using object storage. All locations are “explicit, immutable, and absolute” as defined in metadata
-
-* operating on top of a distributed file system with data stored in one of several open file formats (Avro, Parquet, and ORC) and metadata (Avro)
+Iceberg was designed to run completely abstracted from physical storage using object storage. All locations are “explicit, immutable, and absolute” as defined in metadata
 
 They make a point of saying that the intended use case is for a large, but slow-changing dataset.
 
@@ -108,9 +198,35 @@ Additionally, pyiceberg includes support for working with out-of-tree catalog im
 
 ### Iceberg vs Delta
 
-Iceberg not at t
+#### Maturity
+
+There is a vast difference in maturity between Iceberg and Delta. Arguably the functional scope of Iceberg is also larger, where the functional equivalents of Delta are part of the closed source Databricks ecosystem.
+
+#### Unique to Iceberg
+
+##### Concurrent Writes to Same Table
 
 Iceberg does have several features' delta is lacking. Iceberg supports concurrent writes to the same Delta table from multiple spark drivers natively, whereas Delta requires a [workaround using DynamoDB and explicit feature/version toggle on all LogStore writers](https://docs.delta.io/latest/delta-storage.html#-delta-storage-s3-multi-cluster)
+
+##### Partition Layout Evolution
+
+> Partition layout evolution can update the layout of a table as data volume or query patterns change
+
+As described in [Storage Separation](#storage-separation) common query transformations can be implemented as partitions, reducing re-computation. Reading between the lines it feels like the goal is to have this as an adaptive component of Iceberg rather than relying on explicit implementation.
+
+#### Common to Both
+
+##### ACID transactions
+
+ACID transactionality seems to be provided via the Catalog implementation. How exactly this works for the use case of direct comm Apache Hive (which is provided via built in to Iceberg)
+
+#### Time Travel
+    <!-- Time travel enables reproducible queries that use exactly the same table snapshot, or lets users easily examine changes -->
+
+#### Version Rollback
+    <!-- Version rollback allows users to quickly correct problems by resetting tables to a good state -->
+
+#### Unique to Delta
 
 ## Starting simple
 
