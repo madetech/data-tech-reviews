@@ -2,41 +2,40 @@
 
 <!-- vim-markdown-toc GFM -->
 
-    * [Brief description](#brief-description)
-    * [Licensing / pricing model](#licensing--pricing-model)
-    * [Project Maturity](#project-maturity)
-            * [Open Format Specification](#open-format-specification)
-        * [Java Libraries](#java-libraries)
-        * [Pyiceberg](#pyiceberg)
-    * [What Are the Goals of Iceberg?](#what-are-the-goals-of-iceberg)
-        * [Serializable isolation](#serializable-isolation)
-        * [Speed](#speed)
-        * [Scale](#scale)
-        * [Evolution](#evolution)
-        * [Dependable Types](#dependable-types)
-        * [Storage Separation](#storage-separation)
-        * [Formats](#formats)
-    * [Main components](#main-components)
-        * [Iceberg Table Specification](#iceberg-table-specification)
-        * [Catalog Service](#catalog-service)
-    * [Integrations](#integrations)
-    * [Comparison with other data lake filesystems](#comparison-with-other-data-lake-filesystems)
-        * [Iceberg vs Delta](#iceberg-vs-delta)
-            * [Maturity](#maturity)
-            * [Unique to Iceberg](#unique-to-iceberg)
-                * [Concurrent Writes to Same Table](#concurrent-writes-to-same-table)
-                * [Partition Layout Evolution](#partition-layout-evolution)
-            * [Common to Both](#common-to-both)
-                * [ACID transactions](#acid-transactions)
-            * [Time Travel](#time-travel)
-            * [Version Rollback](#version-rollback)
-            * [Unique to Delta](#unique-to-delta)
-    * [Starting simple](#starting-simple)
-    * [Scalable Production](#scalable-production)
-    * [Draft of a deployment design](#draft-of-a-deployment-design)
-    * [Working examples](#working-examples)
-    * [Core concepts](#core-concepts)
-    * [Reference](#reference)
+* [Brief description](#brief-description)
+* [Licensing / pricing model](#licensing--pricing-model)
+* [Project Maturity](#project-maturity)
+    * [Open Format Specification](#open-format-specification)
+    * [Java Libraries](#java-libraries)
+    * [Pyiceberg](#pyiceberg)
+* [What Are the Goals of Iceberg?](#what-are-the-goals-of-iceberg)
+    * [Serializable isolation](#serializable-isolation)
+    * [Speed](#speed)
+    * [Scale](#scale)
+    * [Evolution](#evolution)
+    * [Dependable Types](#dependable-types)
+    * [Storage Separation](#storage-separation)
+    * [Formats](#formats)
+* [Main components](#main-components)
+    * [Iceberg Table Specification](#iceberg-table-specification)
+    * [Catalog Service](#catalog-service)
+* [Integrations](#integrations)
+* [Comparison with other data lake filesystems](#comparison-with-other-data-lake-filesystems)
+    * [Iceberg vs Delta](#iceberg-vs-delta)
+        * [Maturity](#maturity)
+        * [Unique to Iceberg](#unique-to-iceberg)
+            * [Concurrent Writes to Same Table](#concurrent-writes-to-same-table)
+            * [Partition Layout Evolution](#partition-layout-evolution)
+        * [Common to Both](#common-to-both)
+            * [ACID transactions](#acid-transactions)
+        * [Time Travel](#time-travel)
+        * [Version Rollback](#version-rollback)
+        * [Unique to Delta](#unique-to-delta)
+* [Starting simple](#starting-simple)
+* [Scalable Production](#scalable-production)
+* [Draft of a deployment design](#draft-of-a-deployment-design)
+* [Working examples](#working-examples)
+* [Reference](#reference)
 
 <!-- vim-markdown-toc -->
 
@@ -57,7 +56,7 @@ Originally developed by Netflix, released to the public domain in 2017, donated 
 
 ## Project Maturity
 
-#### Open Format Specification
+### Open Format Specification
 
 Version 1 and 2 of the format specification have been completed and adopted by the community. The two releases see to be additive in scope.
 
@@ -191,7 +190,6 @@ Additionally, pyiceberg includes support for working with out-of-tree catalog im
 
 * DynamoDb Catalog
 
-
 ## Integrations
 
 ## Comparison with other data lake filesystems
@@ -206,7 +204,7 @@ There is a vast difference in maturity between Iceberg and Delta. Arguably the f
 
 ##### Concurrent Writes to Same Table
 
-Iceberg does have several features' delta is lacking. Iceberg supports concurrent writes to the same Delta table from multiple spark drivers natively, whereas Delta requires a [workaround using DynamoDB and explicit feature/version toggle on all LogStore writers](https://docs.delta.io/latest/delta-storage.html#-delta-storage-s3-multi-cluster)
+Iceberg supports concurrent writes to the same Delta table from multiple spark drivers natively, whereas Delta requires a [workaround using DynamoDB and explicit feature/version toggle on all LogStore writers](https://docs.delta.io/latest/delta-storage.html#-delta-storage-s3-multi-cluster)
 
 ##### Partition Layout Evolution
 
@@ -266,10 +264,6 @@ If we `docker-compose exec mc bash` and use the `mc` client to query the `s3` ob
 ## Draft of a deployment design
 
 ## Working examples
-
-## Core concepts
-
-###
 
 ## Reference
 
