@@ -20,6 +20,7 @@
     * [Iceberg Table Specification](#iceberg-table-specification)
     * [Catalog Service](#catalog-service)
 * [Integrations](#integrations)
+    * [Spark](#spark)
 * [Comparison with other data lake filesystems](#comparison-with-other-data-lake-filesystems)
     * [Iceberg vs Delta](#iceberg-vs-delta)
         * [Maturity](#maturity)
@@ -31,6 +32,7 @@
         * [Time Travel](#time-travel)
         * [Version Rollback](#version-rollback)
         * [Unique to Delta](#unique-to-delta)
+    * [Iceberg vs Apache Hive](#iceberg-vs-apache-hive)
 * [Starting simple](#starting-simple)
 * [Scalable Production](#scalable-production)
 * [Draft of a deployment design](#draft-of-a-deployment-design)
@@ -74,7 +76,7 @@ Pyiceberg is versioned separately despite being part of the Iceberg git reposito
 
 > Reads will be isolated from concurrent writes and always use a committed snapshot of a table’s data. Writes will support removing and adding files in a single operation and are never partially visible. Readers will not acquire locks.
 
-Essentially what this means in practice is that, Iceberg supports writes to (immutable) files in the directory structure of the data layer without the contents being registered in the table entity. Iceberg terms this Optimistic Concurrency; any table data or metadata is created optimistically assuming that the current "version" will not be changed before that write is committed.
+Essentially what this means in practice is that, Iceberg supports writes to (immutable) files in the directory structure of the data layer without the contents being registered in the table entity. Iceberg terms this Optimistic Concurrency; any table data or metadata is created optimistically assuming that the current "version" will not be changed before that write is committed. In the case of multiple concurrent writes, the first to win the race succeeds, all others have to be retried.
 
 When the write is committed, the table state is changed (i.e. the new data files previously written are registered against the tables) a new (immutable) metadata file is created, and the pointer held by the catalog service is swapped atomically.
 
@@ -128,7 +130,9 @@ Iceberg fields can be of primitive type (type wrapper around commonly used Avro/
 Partitions are referenced by the top-level table metadata entity (Iceberg calls this a Specification), which also refers to the schemas iterable I mentioned previously. Partitions are applied against a data file, and what's different about Icebergs approach to partitioning is that the partition can represent the result of a transform applied to the data, instead of being limited to the data itself. This can be used to store the result of common filter operations against the data to avoid recomputing.
 <!-- recomputing the values of common operations if that operation has a partition stored against its outputs.  -->
 
-These partition transforms can evolve with time to become more granular whilst still being applicable to the previous use case. The partitioning scheme of a table to be changed without requiring a rewrite of the table (though presumably the partition will have to be added for previously stored data).
+Importantly this means that new partitions can be added without the overhead of adding new fields solely for demarcating partitions, and without the need for querying a partition column explicitly. For example if you have a timestamp column you want to partition by month, you can add a column against a transform that extracts the month from that column rather than needing to extract the month into its own partition column, and utilize the partitioning when querying the timestamp column directly rather than needing to incorporating the extracted month column into the query explicitly. This ability to utilize partitions without knowing their exact structure is what Iceberg calls Hidden Partitioning.
+
+These partition transforms can evolve with time to become more granular whilst still being applicable to the previous use case. The partitioning scheme of a table to be changed without requiring a rewrite of the table; the old data will follow the old partition, new data will follow the new partition, and Iceberg will be made aware in order to plan queries appropriately.
 Queries can be optimised using multiple partitions schemes (data partitioned using different schemes will be planned separately to maximize performance).
 
 ### Formats
@@ -192,6 +196,10 @@ Additionally, pyiceberg includes support for working with out-of-tree catalog im
 
 ## Integrations
 
+### Spark
+
+Iceberg uses a subset of spark isolation levels, namely `seriaizable`
+
 ## Comparison with other data lake filesystems
 
 ### Iceberg vs Delta
@@ -226,8 +234,17 @@ ACID transactionality seems to be provided via the Catalog implementation. How e
 
 #### Unique to Delta
 
+### Iceberg vs Apache Hive
+
+
 ## Starting simple
 
+```shell
+git clone https://github.com/apache/iceberg.git
+cd docker-spark-iceberg
+docker-compose up
+```
+If we open `https://localhost:8888` we see an ipython notebook. Navigate to `Getting Started.ipynb` and select `Cell -> Run All`. You'll see a bunch of Java exceptions crop up
 If we `docker-compose exec mc bash` and use the `mc` client to query the `s3` object store in the `minio` container, we see:
 
 ```shell
@@ -267,5 +284,7 @@ If we `docker-compose exec mc bash` and use the `mc` client to query the `s3` ob
 
 ## Reference
 
+* [Apache Iceberg Spec](https://iceberg.apache.org/spec/)
 * [Lakehouse Architecture with Iceberg and MinIO (by MinIO)](https://blog.min.io/lakehouse-architecture-iceberg-minio/)
 * [AWS Glue native Iceberg interface documentation](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-iceberg.html)
+* [Hidden Partitioning Blogpost](https://www.dremio.com/blog/fewer-accidental-full-table-scans-brought-to-you-by-apache-icebergs-hidden-partitioning/)
