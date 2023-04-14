@@ -1,0 +1,89 @@
+@startuml
+skinparam monochrome true
+skinparam componentStyle uml2
+
+
+title Iceberg Architecture
+
+top to bottom direction
+
+node "Distributed Storage Layer" as storage {
+
+    top to bottom direction
+    package "Solution Layer" as solution {
+        package "HadoopFileIO" as hadoop {
+        }
+
+        package "S3FileIO" as s3 {
+            component "Dell Enterprise Object Storage" as dell
+            component "AWS S3" as awss3
+            component "Minio S3" as minios3
+        }
+
+        package "Azure Data Lake" as adlfs {
+        }
+
+        package "Google Cloud Storage" as gcs {
+        }
+    }
+    node "Data Layer"  as data {
+        component [Avro]
+        component [Parquet]
+        component [ORC]
+    }
+
+    node "Metadata Layer" as metadata {
+        component [Avro] as avro
+        component [JSON]
+    }
+    solution -[hidden]-> metadata
+    metadata -[hidden]-> data
+}
+
+node "Catalog Layer" as catalog {
+    left to right direction
+    node "API Layer" as api {
+        top to bottom direction
+        package "internal clients" as clients {
+            component [Java API] as java
+            component [pyiceberg] as python
+        }
+    }
+    node "Persistence Layer" as persistence {
+        top to bottom direction
+        package "REST Catalog" as REST {
+        }
+        package "JDBC Catalog" as JDBC {
+        }
+        package "Hive Catalog" as hive {
+        }
+        package "Spark Catalog" as hive {
+        }
+        package "AWS Glue Catalog" as glue {
+        }
+        package "AWS DynamoDB Catalog" as dynamodb {
+        }
+        package "Snowflake Catalog" as snowflake {
+        }
+    }
+    node "Processing Layer" as processing {
+        top to bottom direction
+        package "Apache Spark" as spark {
+            component [Spark DataFrameWriterV2 API]
+            component [Spark DataFrameReader API]
+            component [Spark DataStreamWriter API]
+            component [Spark DataStreamReader API]
+            component [Spark DataSourceV2 API]
+        }
+        package "Apache Flink" as flink {
+            component [Flink DataStream API]
+            component [Flink Table API]
+        }
+        package "Apache Hive" as hive {
+            component [Hive StorageHandler]
+        }
+    }
+}
+
+
+@enduml
