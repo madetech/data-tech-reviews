@@ -66,64 +66,69 @@ title Iceberg Architecture
 
 top to bottom direction
 
-node "Data Layer"  as data {
-    left to right direction
-    component [Avro]
-    component [Parquet]
-    component [ORC]
-}
 
-node "Metadata Layer" as metadata {
-    left to right direction
-    component [Avro] as avro
-    component [JSON]
-}
 
 node "Distributed Storage Layer" as storage {
 
-    package "HadoopFileIO" as hadoop {
+    top to bottom direction
+    package "Solution Layer" as solution {
+        package "HadoopFileIO" as hadoop {
+        }
+
+        package "S3FileIO" as s3 {
+            component "Dell Enterprise Object Storage" as dell
+            component "AWS S3" as awss3
+            component "Minio S3" as minios3
+        }
+
+        package "Azure Data Lake" as adlfs {
+        }
+
+        package "Google Cloud Storage" as gcs {
+        }
+    }
+    node "Data Layer"  as data {
+        component [Avro]
+        component [Parquet]
+        component [ORC]
     }
 
-    package "S3FileIO" as s3 {
-        component "Dell Enterprise Object Storage" as dell
-        component "AWS S3" as awss3
-        component "Minio S3" as minios3
+    node "Metadata Layer" as metadata {
+        component [Avro] as avro
+        component [JSON]
     }
-
-    package "Azure Data Lake" as adlfs {
-    }
-
-    package "Google Cloud Storage" as gcs {
-    }
+    solution -[hidden]-> metadata
+    metadata -[hidden]-> data
 }
 
 node "Catalog Layer" as catalog {
-    package "REST Catalog" as REST {
-        left to right direction
-    }
-    package "JDBC Catalog" as JDBC {
-    }
-    package "Hive Catalog" as hive {
-    }
-    package "Spark Catalog" as hive {
-    }
-    package "AWS Glue Catalog" as glue {
-    }
-    package "AWS DynamoDB Catalog" as dynamodb {
-    }
-    package "Snowflake Catalog" as snowflake {
-    }
-
-}
-
-node "API Layer" as api {
     left to right direction
-
-    package "internal clients" as clients {
-        component [Java API] as java
-        component [pyiceberg] as python
+    node "API Layer" as api {
+        top to bottom direction
+        package "internal clients" as clients {
+            component [Java API] as java
+            component [pyiceberg] as python
+        }
     }
-    package "external clients" as clients {
+    node "Persistence Layer" as persistence {
+        top to bottom direction
+        package "REST Catalog" as REST {
+        }
+        package "JDBC Catalog" as JDBC {
+        }
+        package "Hive Catalog" as hive {
+        }
+        package "Spark Catalog" as hive {
+        }
+        package "AWS Glue Catalog" as glue {
+        }
+        package "AWS DynamoDB Catalog" as dynamodb {
+        }
+        package "Snowflake Catalog" as snowflake {
+        }
+    }
+    node "Processing Layer" as processing {
+        top to bottom direction
         package "Apache Spark" as spark {
             component [Spark DataFrameWriterV2 API]
             component [Spark DataFrameReader API]
@@ -140,11 +145,6 @@ node "API Layer" as api {
         }
     }
 }
-
-data -[hidden]- metadata
-metadata -[hidden]- storage
-storage -[hidden]- catalog
-catalog -[hidden]- api
 
 
 @enduml
