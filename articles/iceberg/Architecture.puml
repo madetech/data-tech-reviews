@@ -65,6 +65,8 @@ node "Catalog Layer" as catalog {
         }
         package "Snowflake Catalog" as snowflake {
         }
+        package "Nessie Catalog" as nessie {
+        }
     }
     node "Processing Layer" as processing {
         top to bottom direction
@@ -84,6 +86,5 @@ node "Catalog Layer" as catalog {
         }
     }
 }
-
 
 @enduml
