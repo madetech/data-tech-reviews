@@ -21,6 +21,8 @@
     * [Catalog Service](#catalog-service)
 * [Integrations](#integrations)
     * [Spark](#spark)
+        * [Structured streaming](#structured-streaming)
+    * [Hive](#hive)
 * [Comparison with other data lake filesystems](#comparison-with-other-data-lake-filesystems)
     * [Iceberg vs Delta](#iceberg-vs-delta)
         * [Maturity](#maturity)
@@ -29,12 +31,7 @@
             * [Partition Layout Evolution](#partition-layout-evolution)
         * [Common to Both](#common-to-both)
             * [ACID transactions](#acid-transactions)
-        * [Time Travel](#time-travel)
-        * [Version Rollback](#version-rollback)
-        * [Spark structured streaming](#spark-structured-streaming)
-        * [Unique to Delta](#unique-to-delta)
-    * [Iceberg vs Apache Hive](#iceberg-vs-apache-hive)
-* [Limitations](#limitations)
+        * [Time Travel/Version Rollback](#time-travelversion-rollback)
 * [Starting simple](#starting-simple)
 * [Scalable Production](#scalable-production)
 * [Draft of a deployment design](#draft-of-a-deployment-design)
@@ -168,37 +165,51 @@ Iceberg operates on top of a distributed file system with data (Avro, Parquet & 
 
 ## Main components
 
+The envisioned architecture is detailed in the follow graphic ![Graphic detailing target architecture of Iceberg.](https://iceberg.apache.org/img/iceberg-metadata.png)
+
+This graphic describes a single stateful service (Catalog), which operates on the file store directly in the metadata/data layers.
+
 ### Iceberg Table Specification
 
 Iceberg was designed to run completely abstracted from physical storage using object storage. All locations are “explicit, immutable, and absolute” as defined in metadata
 
 All data and metadata files are immutable, row-level deletion is handled by creating new metadata files listing deletes rather than rewriting the existing data files.
 
-The envisioned architecture is detailed in the follow graphic ![Graphic detailing target architecture of Iceberg.](https://iceberg.apache.org/img/iceberg-metadata.png)
-
-This graphic describes a single stateful service (Catalog) operating in (presumably) API layer, which operates on the file store directly in the metadata/data layers.
-
 Digging into this we can see that the state of the service is simply to hold a pointer to the latest table state in the form of a metadata file (swapped atomically)
 
 ### Catalog Service
 
-Iceberg supports a variety of Catalog implementations, the following have in-tree Java Service and pyiceberg client implementations:
+Iceberg supports a variety of Catalog implementations:
 
 * Iceberg's native REST Catalog
 * JDBC Catalog
 * Hive Catalog
 * Spark Catalog
 * AWS Glue Catalog
-
-Additionally, pyiceberg includes support for working with out-of-tree catalog implementations:
-
 * DynamoDb Catalog
+
+Regardless of the implementation, the goal of the catalog service is to provide the single-source-of-truth for metadata state; managing namespaces, partitioning, and updates to table state.
 
 ## Integrations
 
 ### Spark
 
-Iceberg uses a subset of spark isolation levels, namely `seriaizable`
+Iceberg features full support for the following spark APIs
+* Spark DataFrameWriterV2 API
+* Spark DataFrameReader API
+* Spark DataStreamWriter API
+* Spark DataStreamReader API
+* Spark DataSourceV2 API
+
+#### Structured streaming
+
+Iceberg supports both reading and writing Dataframes using Sparks native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables. These streams are processed as microbatches
+
+<!-- ### Nessie/LakeFS -->
+
+<!-- Both Nessie and LakeFS support Iceberg as a backend. -->
+
+### Hive
 
 ## Comparison with other data lake filesystems
 
@@ -226,28 +237,21 @@ As described in [Storage Separation](#storage-separation) common query transform
 
 ACID transactionality seems to be provided via the Catalog implementation. How exactly this works for the use case of direct comm Apache Hive (which is provided via built in to Iceberg)
 
-#### Time Travel
+#### Time Travel/Version Rollback
 
 In Iceberg both data and metadata files are immutable, with any row level deletes being stored as separate files rather than overwriting the immutable data file. Any data updates will result in a new snapshot on commit. Any metadata updates are done with incremental ordering so state at any one moment in time is unambiguous. Time travel is possible to any point in time that has a snapshot associated, as that snapshot contains direct references to the immutable data files known to Iceberg (i.e. reflected in the table state) at that point in time.
 
 In contrast, Delta stores incremental data changes as a delta in a transaction log. Time travel starts from the current states and reverts the changes described by the transaction log until arriving at the desired state.
 
-#### Version Rollback
-<!-- Version rollback allows users to quickly correct problems by resetting tables to a good state -->
+<!-- #### Unique to Delta -->
 
-#### Spark structured streaming
-
-Iceberg supports both reading and writing Dataframes using Sparks native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables.
-
-#### Unique to Delta
-
-### Iceberg vs Apache Hive
+<!-- ### Iceberg vs Apache Hive -->
 
 <!-- https://www.dremio.com/resources/guides/apache-iceberg-an-architectural-look-under-the-covers/ -->
 
-## Limitations
+<!-- ## Limitations -->
 
->...large, slow-changing collection of files built on open formats over a distributed filesystem or key-value store
+<!-- >...large, slow-changing collection of files built on open formats over a distributed filesystem or key-value store -->
 
 ## Starting simple
 
