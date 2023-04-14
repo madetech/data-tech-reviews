@@ -54,6 +54,102 @@ Essentially Iceberg has three components, all versioned separately:
 
 Other processing engines have their own out-of-tree integrations with Iceberg (AWS Glue, Presto, Trino, Impala). Snowflake have released support for Iceberg Tables as a open-standard alternative to their proprietary table format to [public preview](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
 
+There's a lot of moving parts in play here
+
+```puml
+@startuml
+skinparam monochrome true
+skinparam componentStyle uml2
+
+
+title Iceberg Architecture
+
+top to bottom direction
+
+node "Data Layer"  as data {
+    left to right direction
+    component [Avro]
+    component [Parquet]
+    component [ORC]
+}
+
+node "Metadata Layer" as metadata {
+    left to right direction
+    component [Avro] as avro
+    component [JSON]
+}
+
+node "Distributed Storage Layer" as storage {
+
+    package "HadoopFileIO" as hadoop {
+    }
+
+    package "S3FileIO" as s3 {
+        component "Dell Enterprise Object Storage" as dell
+        component "AWS S3" as awss3
+        component "Minio S3" as minios3
+    }
+
+    package "Azure Data Lake" as adlfs {
+    }
+
+    package "Google Cloud Storage" as gcs {
+    }
+}
+
+node "Catalog Layer" as catalog {
+    package "REST Catalog" as REST {
+        left to right direction
+    }
+    package "JDBC Catalog" as JDBC {
+    }
+    package "Hive Catalog" as hive {
+    }
+    package "Spark Catalog" as hive {
+    }
+    package "AWS Glue Catalog" as glue {
+    }
+    package "AWS DynamoDB Catalog" as dynamodb {
+    }
+    package "Snowflake Catalog" as snowflake {
+    }
+
+}
+
+node "API Layer" as api {
+    left to right direction
+
+    package "internal clients" as clients {
+        component [Java API] as java
+        component [pyiceberg] as python
+    }
+    package "external clients" as clients {
+        package "Apache Spark" as spark {
+            component [Spark DataFrameWriterV2 API]
+            component [Spark DataFrameReader API]
+            component [Spark DataStreamWriter API]
+            component [Spark DataStreamReader API]
+            component [Spark DataSourceV2 API]
+        }
+        package "Apache Flink" as flink {
+            component [Flink DataStream API]
+            component [Flink Table API]
+        }
+        package "Apache Hive" as hive {
+            component [Hive StorageHandler]
+        }
+    }
+}
+
+data -[hidden]- metadata
+metadata -[hidden]- storage
+storage -[hidden]- catalog
+catalog -[hidden]- api
+
+
+@enduml
+```
+
 ## Licensing / pricing model
 
 Originally developed by Netflix, released to the public domain in 2017, donated to Apache Foundation in 2018. Released under the [Apache License 2.0](https://github.com/apache/iceberg/blob/master/LICENSE)
