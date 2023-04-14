@@ -31,8 +31,10 @@
             * [ACID transactions](#acid-transactions)
         * [Time Travel](#time-travel)
         * [Version Rollback](#version-rollback)
+        * [Spark structured streaming](#spark-structured-streaming)
         * [Unique to Delta](#unique-to-delta)
     * [Iceberg vs Apache Hive](#iceberg-vs-apache-hive)
+* [Limitations](#limitations)
 * [Starting simple](#starting-simple)
 * [Scalable Production](#scalable-production)
 * [Draft of a deployment design](#draft-of-a-deployment-design)
@@ -170,9 +172,7 @@ Iceberg operates on top of a distributed file system with data (Avro, Parquet & 
 
 Iceberg was designed to run completely abstracted from physical storage using object storage. All locations are “explicit, immutable, and absolute” as defined in metadata
 
-They make a point of saying that the intended use case is for a large, but slow-changing dataset.
-
->...large, slow-changing collection of files built on open formats over a distributed filesystem or key-value store
+All data and metadata files are immutable, row-level deletion is handled by creating new metadata files listing deletes rather than rewriting the existing data files.
 
 The envisioned architecture is detailed in the follow graphic ![Graphic detailing target architecture of Iceberg.](https://iceberg.apache.org/img/iceberg-metadata.png)
 
@@ -227,15 +227,27 @@ As described in [Storage Separation](#storage-separation) common query transform
 ACID transactionality seems to be provided via the Catalog implementation. How exactly this works for the use case of direct comm Apache Hive (which is provided via built in to Iceberg)
 
 #### Time Travel
-    <!-- Time travel enables reproducible queries that use exactly the same table snapshot, or lets users easily examine changes -->
+
+In Iceberg both data and metadata files are immutable, with any row level deletes being stored as separate files rather than overwriting the immutable data file. Any data updates will result in a new snapshot on commit. Any metadata updates are done with incremental ordering so state at any one moment in time is unambiguous. Time travel is possible to any point in time that has a snapshot associated, as that snapshot contains direct references to the immutable data files known to Iceberg (i.e. reflected in the table state) at that point in time.
+
+In contrast, Delta stores incremental data changes as a delta in a transaction log. Time travel starts from the current states and reverts the changes described by the transaction log until arriving at the desired state.
 
 #### Version Rollback
-    <!-- Version rollback allows users to quickly correct problems by resetting tables to a good state -->
+<!-- Version rollback allows users to quickly correct problems by resetting tables to a good state -->
+
+#### Spark structured streaming
+
+Iceberg supports both reading and writing Dataframes using Sparks native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables.
 
 #### Unique to Delta
 
 ### Iceberg vs Apache Hive
 
+<!-- https://www.dremio.com/resources/guides/apache-iceberg-an-architectural-look-under-the-covers/ -->
+
+## Limitations
+
+>...large, slow-changing collection of files built on open formats over a distributed filesystem or key-value store
 
 ## Starting simple
 
@@ -244,6 +256,7 @@ git clone https://github.com/apache/iceberg.git
 cd docker-spark-iceberg
 docker-compose up
 ```
+
 If we open `https://localhost:8888` we see an ipython notebook. Navigate to `Getting Started.ipynb` and select `Cell -> Run All`. You'll see a bunch of Java exceptions crop up
 If we `docker-compose exec mc bash` and use the `mc` client to query the `s3` object store in the `minio` container, we see:
 
@@ -351,38 +364,73 @@ avro-tools tojson <(docker-compose exec -it  mc mc cat minio/warehouse/nyc/taxis
 }
 ```
 
-and one of the `metadata.json` files
+and one of the `metadata.json` files. Let's make it the latest one to make it more interesting.
 
 ```shell
-I docker-spark-iceberg main+5/-1[!?⇡2]via 🌟docker-compose exec -it  mc mc cat minio/warehouse/nyc/taxis/metadata/00000-314d91a6-0802-418f-979a-08fe0a900864.metadata.json | jq
+I docker-spark-iceberg main+5/-1[!?⇡2]via 🌟docker-compose exec -it  mc mc cat minio/warehouse/nyc/taxis/metadata/00010-1804bb48-de71-4bf9-98af-bbaa544e5b3a.metadata.json | jq
 {
   "format-version": 1,
-  "table-uuid": "8d53f949-d4c9-4ca9-92b4-24d30832a0b6",
+  "table-uuid": "eb6b3a46-2ccf-4998-bce2-66cdd69661e4",
   "location": "s3://warehouse/nyc/taxis",
-  "last-updated-ms": 1681321055096,
-  "last-column-id": 19,
+  "last-updated-ms": 1681321147288,
+  "last-column-id": 20,
   "schema": {
-    ...
+    "type": "struct",
+    "schema-id": 5,
+    "fields": [
+      ...
+      {
+        "id": 19,
+        "name": "airport_fee",
+        "required": false,
+        "type": "double"
+      }
+    ]
   },
-  "current-schema-id": 0,
+  "current-schema-id": 5,
   "schemas": [
+    ...
     {
       "type": "struct",
-      "schema-id": 0,
+      "schema-id": 5,
       "fields": [
         ...
+        {
+          "id": 19,
+          "name": "airport_fee",
+          "required": false,
+          "type": "double"
+        }
       ]
     }
   ],
-  "partition-spec": [],
-  "default-spec-id": 0,
+  "partition-spec": [
+    {
+      "name": "VendorID",
+      "transform": "identity",
+      "source-id": 1,
+      "field-id": 1000
+    }
+  ],
+  "default-spec-id": 1,
   "partition-specs": [
     {
       "spec-id": 0,
       "fields": []
+    },
+    {
+      "spec-id": 1,
+      "fields": [
+        {
+          "name": "VendorID",
+          "transform": "identity",
+          "source-id": 1,
+          "field-id": 1000
+        }
+      ]
     }
   ],
-  "last-partition-id": 999,
+  "last-partition-id": 1000,
   "default-sort-order-id": 0,
   "sort-orders": [
     {
@@ -392,52 +440,68 @@ I docker-spark-iceberg main+5/-1[!?⇡2]via 🌟docker-compose exec -it  mc m
   ],
   "properties": {
     "owner": "root",
-    "created-at": "2023-04-12T17:37:23.302927946Z",
+    "created-at": "2023-04-12T17:37:54.052498091Z",
     "write.format.default": "parquet"
   },
-  "current-snapshot-id": 1589225895743525400,
+  "current-snapshot-id": 4791484976322437000,
   "refs": {
     "main": {
-      "snapshot-id": 1589225895743525400,
+      "snapshot-id": 4791484976322437000,
       "type": "branch"
     }
   },
   "snapshots": [
+    ...
     {
-      "snapshot-id": 1589225895743525400,
-      "timestamp-ms": 1681321055096,
+      "snapshot-id": 6262805942806938000,
+      "parent-snapshot-id": 1509695290243621400,
+      "timestamp-ms": 1681321145203,
       "summary": {
-        "operation": "append",
+        "operation": "overwrite",
         "spark.app.id": "local-1681320992619",
         "added-data-files": "1",
-        "added-records": "2171187",
-        "added-files-size": "34536512",
+        "deleted-data-files": "1",
+        "added-records": "17703",
+        "deleted-records": "49162",
+        "added-files-size": "299938",
+        "removed-files-size": "813190",
         "changed-partition-count": "1",
-        "total-records": "2171187",
-        "total-files-size": "34536512",
+        "total-records": "17703",
+        "total-files-size": "299938",
         "total-data-files": "1",
         "total-delete-files": "0",
         "total-position-deletes": "0",
         "total-equality-deletes": "0"
       },
-      "manifest-list": "s3://warehouse/nyc/taxis/metadata/snap-1589225895743525481-1-9dc86170-01c3-4570-ac05-3339c987738a.avro",
-      "schema-id": 0
+      "manifest-list": "s3://warehouse/nyc/taxis/metadata/snap-6262805942806938103-1-8b3afebb-a045-487a-b65c-8d9e8a44c5d0.avro",
+      "schema-id": 5
     }
   ],
   "statistics": [],
   "snapshot-log": [
     {
-      "timestamp-ms": 1681321055096,
-      "snapshot-id": 1589225895743525400
-    }
+      "timestamp-ms": 1681321082760,
+      "snapshot-id": 4791484976322437000
+    },
+    ...
   ],
-  "metadata-log": []
+  "metadata-log": [
+    {
+      "timestamp-ms": 1681321082760,
+      "metadata-file": "s3://warehouse/nyc/taxis/metadata/00000-baefca3c-3770-41c8-a4d7-d459d585c7c4.metadata.json"
+    },
+   ...
+  ]
 }
 ```
 
-I've abridged the verbose parts, so feel free to run this yourself if you're interested
+I've abridged the verbose parts, so feel free to run this yourself if you're interested.
+
+Let's look
 
 ## Scalable Production
+
+Iceberg documents a potential production setup using [AWS](https://github.com/apache/iceberg/blob/master/docs/aws.md)
 
 ## Draft of a deployment design
 
