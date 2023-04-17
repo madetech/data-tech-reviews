@@ -17,8 +17,9 @@
   * [Storage Separation](#storage-separation)
   * [Formats](#formats)
 * [Main components](#main-components)
-  * [Iceberg Table Specification](#iceberg-table-specification)
   * [Catalog Service](#catalog-service)
+  * [FileIO Interface](#fileio-interface)
+  * [Iceberg Table Specification](#iceberg-table-specification)
 * [Integrations](#integrations)
   * [Spark](#spark)
     * [Structured streaming](#structured-streaming)
@@ -165,17 +166,15 @@ Iceberg operates on top of a distributed file system with data (Avro, Parquet & 
 
 ## Main components
 
-The envisioned architecture is detailed in the follow graphic ![Graphic detailing target architecture of Iceberg.](https://iceberg.apache.org/img/iceberg-metadata.png)
+We can characterise the position of Iceberg within a data engineering stack with the following graphic ![Graphic detailing target architecture of Iceberg.](./StarburstIcebergAnimation.gif)
 
-This graphic describes a single stateful service (Catalog), which operates on the file store directly in the metadata/data layers.
+Starting from the top, a job is planned within some compute engine that requires data in iceberg, the compute then queries iceberg catalog via the relevant adapter, uses current metadata to planand execute against the relevant data files provided.
 
-### Iceberg Table Specification
+Going down a level, we can see in the following graphic how this planning process goes from table-space to a list of references to relevant data files. ![Graphic detailing target architecture of Iceberg.](./DellIcebergGraphic.png)
 
-Iceberg was designed to run completely abstracted from physical storage using object storage. All locations are “explicit, immutable, and absolute” as defined in metadata
+And we can see in the final graphic how these entities are operated on is detailed in the follow graphic ![Graphic detailing target architecture of Iceberg.](./DellServiceArchitectureGraphic.png)
 
-All data and metadata files are immutable, row-level deletion is handled by creating new metadata files listing deletes rather than rewriting the existing data files.
-
-Digging into this we can see that the state of the service is simply to hold a pointer to the latest table state in the form of a metadata file (swapped atomically)
+<!-- This graphic describes a single stateful service (Catalog), which operates on the file store directly in the metadata/data layers. To keep it simple, let's go through this stack from top to bottom. -->
 
 ### Catalog Service
 
@@ -191,11 +190,23 @@ Iceberg supports a variety of Catalog implementations:
 
 Regardless of the implementation, the goal of the catalog service is to provide the single-source-of-truth for metadata state; managing namespaces, partitioning, and updates to table state.
 
+### FileIO Interface
+
+The FileIO API performs metadata operations during the planning and commit phases. Tasks use FileIO to read and write the underlying data files, and the locations of these files are included in the table metadata during a commit.
+
+### Iceberg Table Specification
+
+Iceberg was designed to run completely abstracted from physical storage using object storage. All locations are “explicit, immutable, and absolute” as defined in metadata
+
+All data and metadata files are immutable, row-level deletion is handled by creating new metadata files listing deletes rather than rewriting the existing data files.
+
+Digging into this we can see that the state of the service is simply to hold a pointer to the latest table state in the form of a metadata file (swapped atomically)
+
 ## Integrations
 
 ### Spark
 
-Iceberg features full support for the following spark APIs
+Iceberg features full support for the following spark APIs:
 * `DataFrameWriterV2`
 * `DataFrameReader`
 * `DataStreamWriter`
@@ -218,7 +229,7 @@ Iceberg supports both reading and writing Dataframes using Sparks native structu
 
 #### Maturity
 
-There is a vast difference in maturity between Iceberg and Delta. Arguably the functional scope of Iceberg is also larger, where the functional equivalents of Delta are part of the closed source Databricks ecosystem.
+There is a considerable difference in maturity between Iceberg and Delta. Arguably the functional scope of Iceberg is also larger, where the functional equivalents of Delta are part of the closed source Databricks ecosystem.
 
 #### Unique to Iceberg
 
@@ -267,9 +278,9 @@ This simple example gives us four services.
 * spark-iceberg
 * rest
 
-`minio` is a containerised object storage service with S3 protocol (specifically AWS S3) compatibility. `mc` is a simple client operating on `minio`.
+`minio` is a containerized object storage service with S3 protocol (specifically AWS S3) compatibility. `mc` is a simple client operating on `minio`.
 
-`rest` is an implementation of the Iceberg REST server (namely a thin wrapper around the Java Reference Implementation). Looking at the `docker-compose.yml`, we can see that it has environment variables parameterising the S3 object store (in this case `minio`) used for data/metadata storage, as well as a java path to the FileIO operator use to interface with the object store.
+`rest` is an implementation of the Iceberg REST server (namely a thin wrapper around the Java Reference Implementation). Looking at the `docker-compose.yml`, we can see that it has environment variables parameterizing the S3 object store (in this case `minio`) used for data/metadata storage, as well as a Java path to the FileIO operator use to interface with the object store.
 
 `spark-iceberg` contains:
 * A Jupyter notebook interface
