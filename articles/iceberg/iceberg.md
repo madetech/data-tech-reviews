@@ -33,10 +33,10 @@
     * [Common to Both](#common-to-both)
       * [ACID transactions](#acid-transactions)
     * [Time Travel/Version Rollback](#time-travelversion-rollback)
+* [Limitations](#limitations)
+  * [Performance](#performance)
 * [Starting simple](#starting-simple)
 * [Scalable Production](#scalable-production)
-* [Draft of a deployment design](#draft-of-a-deployment-design)
-* [Working examples](#working-examples)
 * [Reference](#reference)
 
 <!-- vim-markdown-toc -->
@@ -188,7 +188,7 @@ Iceberg supports a variety of Catalog implementations:
 * DynamoDb Catalog
 * Nessie Catalog
 
-Regardless of the implementation, the goal of the catalog service is to provide the single-source-of-truth for metadata state; managing namespaces, partitioning, and updates to table state.
+Each non-native implementation has its own integration which wraps it, but regardless of the implementation, the role of the catalog service is to provide the single-source-of-truth for metadata state; managing namespaces, partitioning, and updates to table state.
 
 ### FileIO Interface
 
@@ -215,13 +215,17 @@ Iceberg features full support for the following spark APIs:
 
 #### Structured streaming
 
-Iceberg supports both reading and writing Dataframes using Sparks native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables. These streams are processed as microbatches
+Iceberg supports both reading and writing Dataframes using Sparks native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables. These streams are processed as microbatches similar to Databricks closed-source implementation.
 
 <!-- ### Nessie/LakeFS -->
 
 <!-- Both Nessie and LakeFS support Iceberg as a backend. -->
 
 ### Hive
+
+Iceberg supports reading and writing Iceberg tables through [Hive](https://hive.apache.org) by using a [StorageHandler](https://cwiki.apache.org/confluence/display/Hive/StorageHandlers).
+
+Hive support is rapidly evolving with recent 4.0 release candidates including Iceberg as a dependency, and coming close to supporting the complete Iceberg feature set.
 
 ## Comparison with other data lake filesystems
 
@@ -261,9 +265,13 @@ In contrast, Delta stores incremental data changes as a delta in a transaction l
 
 <!-- https://www.dremio.com/resources/guides/apache-iceberg-an-architectural-look-under-the-covers/ -->
 
-<!-- ## Limitations -->
+## Limitations
 
 <!-- >...large, slow-changing collection of files built on open formats over a distributed filesystem or key-value store -->
+
+### Performance
+
+As of 2022, Iceberg is being outperformed by Delta in the TPC-DS benchmark. These benchmarks were run against Iceberg and Delta, with Delta demonstrating 33% load performance improvement over Iceberg and between 1.1x and 24x the performance of Iceberg in query performance. Later benchmarking with updated configuration settings revised this to a 2-3x query performance differential in favour of Delta.
 
 ## Starting simple
 
@@ -312,9 +320,9 @@ If we were to submit a simple spark job from an ipython notebook, what would be 
 
 Iceberg documents a potential production setup using [AWS](https://github.com/apache/iceberg/blob/master/docs/aws.md)
 
-## Draft of a deployment design
+<!-- ## Draft of a deployment design -->
 
-## Working examples
+<!-- ## Working examples -->
 
 ## Reference
 
@@ -322,3 +330,5 @@ Iceberg documents a potential production setup using [AWS](https://github.com/ap
 * [Lakehouse Architecture with Iceberg and MinIO (by MinIO)](https://blog.min.io/lakehouse-architecture-iceberg-minio/)
 * [AWS Glue native Iceberg interface documentation](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-iceberg.html)
 * [Hidden Partitioning Blogpost](https://www.dremio.com/blog/fewer-accidental-full-table-scans-brought-to-you-by-apache-icebergs-hidden-partitioning/)
+* [2022 Delta vs Iceberg Benchmarking](https://databeans-blogs.medium.com/delta-vs-iceberg-performance-as-a-decisive-criteria-add7bcdde03d)
+* [2023 Delta vs Iceberg vs Hudi Benchmarking](https://www.onehouse.ai/blog/apache-hudi-vs-delta-lake-vs-apache-iceberg-lakehouse-feature-comparison)
