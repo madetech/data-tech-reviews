@@ -264,7 +264,17 @@ This container is obviously doing way more than it should, but it's not a produc
   * History Server
 * Running a Hive Thrift Server (Not entirely sure what this is for)
 
-If we were to submit a simple spark job from an ipython notebook, what would be happening?
+If we were to load a table from Iceberg using pyspark from an ipython notebook (e.g. `spark.table("demo.nyc.taxis")`, what would be happening?
+
+Let's work through it with the data we have in hand, that is the HTTP logs of the `minio` bucket (`docker-compose exec mc mc admin trace minio`)
+
+1. Spark requests current metadata from the Iceberg REST server via HTTP
+2. Iceberg REST service requests, loads and parses current metadata state from S3
+3. Iceberg populates HTTP response from metadata state, including link to current metadata snapshot (try it yourself `curl --location --request GET 'localhost:8181/v1/namespaces/nyc/tables/taxis?snapshots=all' --header 'Accept: application/json'`)
+4. Spark loads metadata snapshot from S3, including metadata manifest files and their respective partitions
+5. Spark loads manifests from S3, which contain links to the data files and sufficient information that Spark only needs to perform a partial read to load the data it's interested in.
+6. Spark has sufficient information to devise a logical and physical plan, and pass the job(s) off for execution.
+7. When execution has finished, if a commit modifyin the table state is processed, Iceberg REST service will refresh table metadata and update its pointer to the latest metadata state.
 
 ## Scalable Production
 
