@@ -102,19 +102,6 @@ This point is already mostly covered with what I've said above; the metadata req
 
 Schema in this context is the table schema, the names and types of field stored in a table. Importantly, the relationship between tables and schemas is one-to-many, i.e. a table is described by an iterable of schemas. When a new schema is added, this evolution process copies the previous schema, applies the changes, and adds this (immutable) schema to the list of schemas recorded against the table. This gives a full history of how the table structure has evolved over time.
 
-<!-- Exactly how you're allowed to change a schema seems fairly open, but there are notable exceptions. -->
-
-<!-- Valid schema evolutions are: -->
-<!-- * Type promotion (only when it increases field precision) -->
-<!-- * Field addition -->
-<!-- * Field rename -->
-<!-- * Field reordering -->
-<!-- * Field deletion -->
-
-<!-- Invalid schema evolutions are -->
-<!-- * Grouping of structs (nested -->
-<!-- Schema evolution is provided  -->
-
 See [Storage Separation](#storage-separation) for more information on partition evolution.
 
 ### Dependable Types
@@ -133,7 +120,7 @@ Partitions are referenced by the top-level table metadata entity (Iceberg calls 
 Importantly this means that new partitions can be added without the overhead of adding new fields solely for demarcating partitions, and without the need for querying a partition column explicitly. For example if you have a timestamp column you want to partition by month, you can add a column against a transform that extracts the month from that column rather than needing to extract the month into its own partition column, and utilize the partitioning when querying the timestamp column directly rather than needing to incorporating the extracted month column into the query explicitly. This ability to utilize partitions without knowing their exact structure is what Iceberg calls Hidden Partitioning.
 
 These partition transforms can evolve with time to become more granular whilst still being applicable to the previous use case. The partitioning scheme of a table to be changed without requiring a rewrite of the table; the old data will follow the old partition, new data will follow the new partition, and Iceberg will be made aware in order to plan queries appropriately.
-Queries can be optimised using multiple partitions schemes (data partitioned using different schemes will be planned separately to maximize performance).
+Queries can be optimized using multiple partitions schemes (data partitioned using different schemes will be planned separately to maximize performance).
 
 ### Formats
 
@@ -141,40 +128,15 @@ Queries can be optimised using multiple partitions schemes (data partitioned usi
 
 Iceberg operates on top of a distributed file system with data (Avro, Parquet & ORC) and metadata (Avro) stored in common open formats. Iceberg maps its own built-in types to theirs.
 
-<!-- ### Format Specification -->
-
-<!-- ## -->
-
-<!-- #### Schema evolution -->
-<!--     supports add, drop, update, or rename, and has no side-effects -->
-
-<!-- #### Hidden Paritioning -->
-<!--     Hidden partitioning prevents user mistakes that cause silently incorrect results or extremely slow queries -->
-
-<!-- #### Parition Layout Evolution -->
-<!--     Partition layout evolution can update the layout of a table as data volume or query patterns change -->
-
-<!-- #### Time Travel -->
-<!--     Time travel enables reproducible queries that use exactly the same table snapshot, or lets users easily examine changes -->
-
-<!-- #### Version Rollback -->
-<!--     Version rollback allows users to quickly correct problems by resetting tables to a good state -->
-
-<!-- ### Catalog -->
-
-<!-- ### pyiceberg -->
-
 ## Main components
 
-We can characterise the position of Iceberg within a data engineering stack with the following graphic ![Graphic detailing target architecture of Iceberg.](./StarburstIcebergAnimation.gif)
+We can characterize the position of Iceberg within a data engineering stack with the following graphic ![Graphic detailing target architecture of Iceberg.](./StarburstIcebergAnimation.gif)
 
-Starting from the top, a job is planned within some compute engine that requires data in iceberg, the compute then queries iceberg catalog via the relevant adapter, uses current metadata to planand execute against the relevant data files provided.
+Starting from the top, a job is planned within some compute engine that requires data in iceberg, the compute then queries iceberg catalog via the relevant adapter, uses current metadata to plan and execute against the relevant data files provided.
 
 Going down a level, we can see in the following graphic how this planning process goes from table-space to a list of references to relevant data files. ![Graphic detailing target architecture of Iceberg.](./DellIcebergGraphic.png)
 
 And we can see in the final graphic how these entities are operated on is detailed in the follow graphic ![Graphic detailing target architecture of Iceberg.](./DellServiceArchitectureGraphic.png)
-
-<!-- This graphic describes a single stateful service (Catalog), which operates on the file store directly in the metadata/data layers. To keep it simple, let's go through this stack from top to bottom. -->
 
 ### Catalog Service
 
@@ -217,10 +179,6 @@ Iceberg features full support for the following spark APIs:
 
 Iceberg supports both reading and writing Dataframes using Sparks native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables. These streams are processed as microbatches similar to Databricks closed-source implementation.
 
-<!-- ### Nessie/LakeFS -->
-
-<!-- Both Nessie and LakeFS support Iceberg as a backend. -->
-
 ### Hive
 
 Iceberg supports reading and writing Iceberg tables through [Hive](https://hive.apache.org) by using a [StorageHandler](https://cwiki.apache.org/confluence/display/Hive/StorageHandlers).
@@ -259,15 +217,7 @@ In Iceberg both data and metadata files are immutable, with any row level delete
 
 In contrast, Delta stores incremental data changes as a delta in a transaction log. Time travel starts from the current states and reverts the changes described by the transaction log until arriving at the desired state.
 
-<!-- #### Unique to Delta -->
-
-<!-- ### Iceberg vs Apache Hive -->
-
-<!-- https://www.dremio.com/resources/guides/apache-iceberg-an-architectural-look-under-the-covers/ -->
-
 ## Limitations
-
-<!-- >...large, slow-changing collection of files built on open formats over a distributed filesystem or key-value store -->
 
 ### Performance
 
@@ -319,10 +269,6 @@ If we were to submit a simple spark job from an ipython notebook, what would be 
 ## Scalable Production
 
 Iceberg documents a potential production setup using [AWS](https://github.com/apache/iceberg/blob/master/docs/aws.md)
-
-<!-- ## Draft of a deployment design -->
-
-<!-- ## Working examples -->
 
 ## Reference
 
