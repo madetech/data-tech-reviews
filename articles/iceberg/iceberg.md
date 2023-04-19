@@ -30,6 +30,7 @@
     * [Unique to Iceberg](#unique-to-iceberg)
       * [Concurrent Writes to Same Table](#concurrent-writes-to-same-table)
       * [Partition Layout Evolution](#partition-layout-evolution)
+      * [Event listeners](#event-listeners)
     * [Common to Both](#common-to-both)
       * [ACID transactions](#acid-transactions)
     * [Time Travel/Version Rollback](#time-travelversion-rollback)
@@ -37,7 +38,6 @@
   * [Performance](#performance)
 * [Starting simple](#starting-simple)
 * [Scalable Production](#scalable-production)
-* [Reference](#reference)
 
 <!-- vim-markdown-toc -->
 
@@ -46,7 +46,7 @@
 > Iceberg is a high-performance format for huge analytic tables. Iceberg brings the reliability and simplicity of SQL tables to big data, while making it possible for engines like Spark, Trino, Flink, Presto, Hive and Impala to safely work with the same tables, at the same time.
 
 Essentially Iceberg has three components, all versioned separately:
-* [Open format specification](https://iceberg.apache.org/spec/) for a table level persistence store
+* Open format specification[^1] for a table level persistence store
 * Java API Layer & Reference implementation for interacting with the format specification, and integrating with processing engines (in-tree: Spark, Flink & Hive)
 * Python API layer & CLI to interact with the Catalog server (or its Glue/Hive/DynamoDB equivalent (?)), and direct querying of the metadata/data layers
 
@@ -83,6 +83,10 @@ When the write is committed, the table state is changed (i.e. the new data files
 > An atomic swap of one table metadata file for another provides the basis for serializable isolation. Readers use the snapshot that was current when they load the table metadata and are not affected by changes until they refresh and pick up a new metadata location.
 
 If the metadata (or specifically the list of snapshots, see the next section for more detail) is no longer concurrent (i.e. does not have the same state as the one fetched when the write began) at point of commit, the writer process must recalculate the new metadata state against the current version, and try to commit this change again. How difficult this is depends on the change being written, and the isolation level which it requires, and is out of scope of this article.
+
+The success of concurrent write operations also depends on the isolation level in a table. Apache Iceberg supports two isolation levels: serializable and snapshot. By default, the isolation level is serializable but can be changed to snapshot.
+
+> “While serializable is the strongest isolation level in databases, snapshot isolation is beneficial for environments with many concurrent writers. The serializable isolation level guarantees that an ongoing UPDATE/DELETE/MERGE operation fails if a concurrent transaction commits a new file that might contain rows matching the condition used in UPDATE/DELETE/MERGE. For example, if there is an ongoing update on a subset of rows and a concurrent transaction adds a new file with records that potentially match the update condition, the update operation must fail under the serializable isolation but can still commit under the snapshot isolation.”
 
 ### Speed
 
@@ -150,6 +154,8 @@ Iceberg supports a variety of Catalog implementations:
 * DynamoDb Catalog
 * Nessie Catalog
 
+The essential requirement for a catalog is that it must support atomic transactions to properly execute atomic Iceberg table commits and read serializable isolation.[^5]
+
 Each non-native implementation has its own integration which wraps it, but regardless of the implementation, the role of the catalog service is to provide the single-source-of-truth for metadata state; managing namespaces, partitioning, and updates to table state.
 
 ### FileIO Interface
@@ -204,6 +210,10 @@ Iceberg supports concurrent writes to the same Delta table from multiple spark d
 > Partition layout evolution can update the layout of a table as data volume or query patterns change
 
 As described in [Storage Separation](#storage-separation) common query transformations can be implemented as partitions, reducing re-computation. Reading between the lines it feels like the goal is to have this as an adaptive component of Iceberg rather than relying on explicit implementation.
+
+##### Event listeners
+
+Iceberg has a framework that allows other services to be notified when an event occurs on an Iceberg table. Currently, this feature is in the early stages, and only an event when a table is scanned can be emitted. This framework, however, provides the ability for future capabilities, such as keeping caches, materialized views, and indexes in sync with the raw data.[^6]
 
 #### Common to Both
 
@@ -274,17 +284,23 @@ Let's work through it with the data we have in hand, that is the HTTP logs of th
 4. Spark loads metadata snapshot from S3, including metadata manifest files and their respective partitions
 5. Spark loads manifests from S3, which contain links to the data files and sufficient information that Spark only needs to perform a partial read to load the data it's interested in.
 6. Spark has sufficient information to devise a logical and physical plan, and pass the job(s) off for execution.
-7. When execution has finished, if a commit modifyin the table state is processed, Iceberg REST service will refresh table metadata and update its pointer to the latest metadata state.
+7. When execution has finished, if a commit modifying the table state is processed, Iceberg REST service will refresh table metadata and update its pointer to the latest metadata state.
+
+If you're interested in learning more, there are a couple of blogs that take a similar file-centric view of Iceberg queries[^7][^8]
 
 ## Scalable Production
 
 Iceberg documents a potential production setup using [AWS](https://github.com/apache/iceberg/blob/master/docs/aws.md)
 
-## Reference
+[^1]: [Apache Iceberg Spec](https://iceberg.apache.org/spec/)
 
-* [Apache Iceberg Spec](https://iceberg.apache.org/spec/)
-* [Lakehouse Architecture with Iceberg and MinIO (by MinIO)](https://blog.min.io/lakehouse-architecture-iceberg-minio/)
-* [AWS Glue native Iceberg interface documentation](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-iceberg.html)
-* [Hidden Partitioning Blogpost](https://www.dremio.com/blog/fewer-accidental-full-table-scans-brought-to-you-by-apache-icebergs-hidden-partitioning/)
-* [2022 Delta vs Iceberg Benchmarking](https://databeans-blogs.medium.com/delta-vs-iceberg-performance-as-a-decisive-criteria-add7bcdde03d)
-* [2023 Delta vs Iceberg vs Hudi Benchmarking](https://www.onehouse.ai/blog/apache-hudi-vs-delta-lake-vs-apache-iceberg-lakehouse-feature-comparison)
+[^2]: [Lakehouse Architecture with Iceberg and MinIO (by MinIO)](https://blog.min.io/lakehouse-architecture-iceberg-minio/)
+[^3]: [AWS Glue native Iceberg interface documentation](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-iceberg.html)
+[^4]: [Hidden Partitioning Blogpost](https://www.dremio.com/blog/fewer-accidental-full-table-scans-brought-to-you-by-apache-icebergs-hidden-partitioning/)
+[^5]: [ACID compliance in Iceberg, by Snowflake](https://medium.com/snowflake/how-apache-iceberg-enables-acid-compliance-for-data-lakes-9069ae783b60)
+[^6]: [Apache Iceberg: An Architectural Look Under the Covers, by dremio](https://www.dremio.com/resources/guides/apache-iceberg-an-architectural-look-under-the-covers/)
+[^7]: [The Life of a Read Query for Apache Iceberg Tables, by dremio](https://www.dremio.com/blog/the-life-of-a-read-query-for-apache-iceberg-tables/)
+[^8]: [A Hands-On Look at the Structure of an Apache Iceberg Table](https://www.dremio.com/blog/a-hands-on-look-at-the-structure-of-an-apache-iceberg-table/)
+
+[^9]: [2022 Delta vs Iceberg Benchmarking](https://databeans-blogs.medium.com/delta-vs-iceberg-performance-as-a-decisive-criteria-add7bcdde03d)
+[^10]: [2023 Delta vs Iceberg vs Hudi Benchmarking](https://www.onehouse.ai/blog/apache-hudi-vs-delta-lake-vs-apache-iceberg-lakehouse-feature-comparison)
