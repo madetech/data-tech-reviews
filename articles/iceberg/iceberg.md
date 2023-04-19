@@ -130,7 +130,7 @@ Iceberg fields can be of primitive type (type wrapper around commonly used Avro/
 Partitions are referenced by the top-level table metadata entity (Iceberg calls this a Specification), which also refers to the schemas iterable I mentioned previously. Partitions are applied against a data file, and what's different about Icebergs approach to partitioning is that the partition can represent the result of a transform applied to the data, instead of being limited to the data itself. This can be used to store the result of common filter operations against the data to avoid recomputing.
 <!-- recomputing the values of common operations if that operation has a partition stored against its outputs.  -->
 
-Importantly this means that new partitions can be added without the overhead of adding new fields solely for demarcating partitions, and without the need for querying a partition column explicitly. For example if you have a timestamp column you want to partition by month, you can add a column against a transform that extracts the month from that column rather than needing to extract the month into its own partition column, and utilize the partitioning when querying the timestamp column directly rather than needing to incorporating the extracted month column into the query explicitly. This ability to utilize partitions without knowing their exact structure is what Iceberg calls Hidden Partitioning.
+Importantly this means that new partitions can be added without the overhead of adding new fields solely for demarcating partitions, and without the need for querying a partition column explicitly. For example if you have a timestamp column you want to partition by month, you can add a column against a transform that extracts the month from that column rather than needing to extract the month into its own partition column, and utilize the partitioning when querying the timestamp column directly rather than needing to incorporating the extracted month column into the query explicitly. This ability to utilize partitions without knowing their exact structure is what Iceberg calls Hidden Partitioning[^4].
 
 These partition transforms can evolve with time to become more granular whilst still being applicable to the previous use case. The partitioning scheme of a table to be changed without requiring a rewrite of the table; the old data will follow the old partition, new data will follow the new partition, and Iceberg will be made aware in order to plan queries appropriately.
 Queries can be optimized using multiple partitions schemes (data partitioned using different schemes will be planned separately to maximize performance).
@@ -256,7 +256,7 @@ Iceberg has a framework that allows other services to be notified when an event 
 
 ##### ACID transactions
 
-ACID transactionality seems to be provided via the Catalog implementation. How exactly this works for the use case of direct comm Apache Hive (which is provided via built in to Iceberg)
+Iceberg provides ACID transactionality is provided via the atomic metadata file swap, optimistic concurrency locking, isolation levels, and durable commit semantics.
 
 #### Time Travel/Version Rollback
 
@@ -268,7 +268,7 @@ In contrast, Delta stores incremental data changes as a delta in a transaction l
 
 ### Performance
 
-As of 2022, Iceberg is being outperformed by Delta in the TPC-DS benchmark. These benchmarks were run against Iceberg and Delta, with Delta demonstrating 33% load performance improvement over Iceberg and between 1.1x and 24x the performance of Iceberg in query performance. Later benchmarking with updated configuration settings revised this to a 2-3x query performance differential in favour of Delta.
+As of 2022, Iceberg is being outperformed by Delta in the TPC-DS benchmark. These benchmarks were run against Iceberg and Delta, with Delta demonstrating 33% load performance improvement over Iceberg and between 1.1x and 24x the performance of Iceberg in query performance[^9]. Later benchmarking with updated configuration settings revised this to a 2-3x query performance differential in favour of Delta[^10].
 
 ## Starting simple
 
