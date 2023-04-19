@@ -159,7 +159,7 @@ Iceberg supports a variety of Catalog implementations:
 * JDBC Catalog
 * Hive Catalog
 * Spark Catalog
-* AWS Glue Catalog
+* AWS Glue Catalog[^3]
 * DynamoDb Catalog
 * Nessie Catalog
 
@@ -335,7 +335,7 @@ Iceberg documents a potential production setup using [AWS](https://github.com/ap
 
 [^2]: [Lakehouse Architecture with Iceberg and MinIO (by MinIO)](https://blog.min.io/lakehouse-architecture-iceberg-minio/)
 [^3]: [AWS Glue native Iceberg interface documentation](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-format-iceberg.html)
-[^4]: [Hidden Partitioning Blogpost](https://www.dremio.com/blog/fewer-accidental-full-table-scans-brought-to-you-by-apache-icebergs-hidden-partitioning/)
+[^4]: [Hidden Partitioning, by dremio](https://www.dremio.com/blog/fewer-accidental-full-table-scans-brought-to-you-by-apache-icebergs-hidden-partitioning/)
 [^5]: [ACID compliance in Iceberg, by Snowflake](https://medium.com/snowflake/how-apache-iceberg-enables-acid-compliance-for-data-lakes-9069ae783b60)
 [^6]: [Apache Iceberg: An Architectural Look Under the Covers, by dremio](https://www.dremio.com/resources/guides/apache-iceberg-an-architectural-look-under-the-covers/)
 [^7]: [The Life of a Read Query for Apache Iceberg Tables, by dremio](https://www.dremio.com/blog/the-life-of-a-read-query-for-apache-iceberg-tables/)
