@@ -18,11 +18,15 @@
   * [Formats](#formats)
 * [Main components](#main-components)
   * [Catalog Service](#catalog-service)
-  * [FileIO Interface](#fileio-interface)
   * [Iceberg Table Specification](#iceberg-table-specification)
+    * [Metadata file](#metadata-file)
+    * [Snapshots](#snapshots)
+    * [Manifest List](#manifest-list)
+    * [Manifest File](#manifest-file)
 * [Integrations](#integrations)
   * [Spark](#spark)
     * [Structured streaming](#structured-streaming)
+    * [Catalog](#catalog)
   * [Hive](#hive)
 * [Comparison with other data lake filesystems](#comparison-with-other-data-lake-filesystems)
   * [Iceberg vs Delta](#iceberg-vs-delta)
@@ -49,6 +53,11 @@ Essentially Iceberg has three components, all versioned separately:
 * Open format specification[^1] for a table level persistence store
 * Java API Layer & Reference implementation for interacting with the format specification, and integrating with processing engines (in-tree: Spark, Flink & Hive)
 * Python API layer & CLI to interact with the Catalog server (or its Glue/Hive/DynamoDB equivalent (?)), and direct querying of the metadata/data layers
+
+Iceberg is not[^6]:
+* A storage engine
+* An execution engine
+* A service
 
 Other processing engines have their own out-of-tree integrations with Iceberg (AWS Glue, Presto, Trino, Impala). Snowflake have released support for Iceberg Tables as a open-standard alternative to their proprietary table format to [public preview](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
 
@@ -146,7 +155,7 @@ And we can see in the final graphic how these entities are operated on is detail
 
 Iceberg supports a variety of Catalog implementations:
 
-* Iceberg's native REST Catalog
+* REST Catalog
 * JDBC Catalog
 * Hive Catalog
 * Spark Catalog
@@ -158,17 +167,38 @@ The essential requirement for a catalog is that it must support atomic transacti
 
 Each non-native implementation has its own integration which wraps it, but regardless of the implementation, the role of the catalog service is to provide the single-source-of-truth for metadata state; managing namespaces, partitioning, and updates to table state.
 
-### FileIO Interface
+The REST is the only native implementation that does not require an external integration. At time of writing there is no service artefact produced for the REST catalog, only Java libraries which require wrapping in a web server (see [here](https://github.com/tabular-io/iceberg-rest-image/blob/master/src/main/java/org/apache/iceberg/rest/RESTCatalogServer.java) for an example. It feels like the REST catalog isn't really the recommended implementation, although that's never said explicitly, and that the expectation is to use one of the other catalog integrations.
 
-The FileIO API performs metadata operations during the planning and commit phases. Tasks use FileIO to read and write the underlying data files, and the locations of these files are included in the table metadata during a commit.
 
 ### Iceberg Table Specification
 
 Iceberg was designed to run completely abstracted from physical storage using object storage. All locations are “explicit, immutable, and absolute” as defined in metadata
 
-All data and metadata files are immutable, row-level deletion is handled by creating new metadata files listing deletes rather than rewriting the existing data files.
+Let's review the different metadata entities from the above diagram:
+[^6]
+#### Metadata file
 
-Digging into this we can see that the state of the service is simply to hold a pointer to the latest table state in the form of a metadata file (swapped atomically)
+![Graphic highlighting metdata file and giving brief summary of its contents.](./metadataFile.png)
+
+The metadata file (point 3 in the above diagram) is the single-source-of-truth for all metadata about the current table state. Whenever the state is mutated a new metadata file is written and the pointer within the Catalog swapped atomically. Among other things it contains a reference to the latest snaphot (point 4 in the above diagram) and the manifest list associated with that snapshot.
+
+#### Snapshots
+
+Defines the state of the table at some point, including all data files, and paritions. Each snapshot is defined by a metadata file known as a manifest list.
+
+
+#### Manifest List
+
+![Graphic highlighting manifest list file and giving brief summary of its contents.](./ManifestList.png)
+
+A manifest list file describes a snapshot, storing amongst other things references to the manifest files that each describe a subset of a snapshot. The manifest list containst summary stats about the row counts, data file counts, and partitions, but detailed information is stored in the manifest files.
+
+#### Manifest File
+
+![Graphic highlighting manifest file and giving brief summary of its contents.](./manifestfile.png)
+
+The manifest file contains the references to the data files themselves, their format, and more detailed stats about each file, and the paritions that are applied to it.
+
 
 ## Integrations
 
@@ -184,6 +214,13 @@ Iceberg features full support for the following spark APIs:
 #### Structured streaming
 
 Iceberg supports both reading and writing Dataframes using Sparks native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables. These streams are processed as microbatches similar to Databricks closed-source implementation.
+
+#### Catalog
+
+Iceberg supplies [two implementations](https://iceberg.apache.org/docs/latest/spark-configuration/#catalog-configuration) of catalogs that integrate directly with Spark:
+
+* `org.apache.iceberg.spark.SparkCatalog`: supports a Hive Metastore or a Hadoop warehouse as a catalog
+* `org.apache.iceberg.spark.SparkSessionCatalog`: adds support for Iceberg tables to Spark’s built-in catalog, and delegates to the built-in catalog for non-Iceberg tables
 
 ### Hive
 
@@ -240,6 +277,7 @@ git clone https://github.com/apache/iceberg.git
 cd docker-spark-iceberg
 docker-compose up
 ```
+
 This simple example gives us four services.
 * minio
 * mc
@@ -248,7 +286,7 @@ This simple example gives us four services.
 
 `minio` is a containerized object storage service with S3 protocol (specifically AWS S3) compatibility. `mc` is a simple client operating on `minio`.
 
-`rest` is an implementation of the Iceberg REST server (namely a thin wrapper around the Java Reference Implementation). Looking at the `docker-compose.yml`, we can see that it has environment variables parameterizing the S3 object store (in this case `minio`) used for data/metadata storage, as well as a Java path to the FileIO operator use to interface with the object store.
+`rest` is an implementation of the Iceberg REST catalog (namely a thin wrapper around the Java Reference Implementation). Looking at the `docker-compose.yml`, we can see that it has environment variables parameterizing the S3 object store (in this case `minio`) used for data/metadata storage, as well as a Java path to the FileIO operator use to interface with the object store.
 
 `spark-iceberg` contains:
 * A Jupyter notebook interface
@@ -272,19 +310,20 @@ This container is obviously doing way more than it should, but it's not a produc
   * Master
   * Worker
   * History Server
-* Running a Hive Thrift Server (Not entirely sure what this is for)
+* Running a Hive Thrift Server (presumably the catalog implementation)
 
 If we were to load a table from Iceberg using pyspark from an ipython notebook (e.g. `spark.table("demo.nyc.taxis")`, what would be happening?
 
 Let's work through it with the data we have in hand, that is the HTTP logs of the `minio` bucket (`docker-compose exec mc mc admin trace minio`)
 
-1. Spark requests current metadata from the Iceberg REST server via HTTP
-2. Iceberg REST service requests, loads and parses current metadata state from S3
+1. Spark requests current metadata from the Iceberg REST catalog via HTTP
+2. Iceberg REST catalog requests, loads and parses current metadata state from S3
 3. Iceberg populates HTTP response from metadata state, including link to current metadata snapshot (try it yourself `curl --location --request GET 'localhost:8181/v1/namespaces/nyc/tables/taxis?snapshots=all' --header 'Accept: application/json'`)
 4. Spark loads metadata snapshot from S3, including metadata manifest files and their respective partitions
 5. Spark loads manifests from S3, which contain links to the data files and sufficient information that Spark only needs to perform a partial read to load the data it's interested in.
 6. Spark has sufficient information to devise a logical and physical plan, and pass the job(s) off for execution.
-7. When execution has finished, if a commit modifying the table state is processed, Iceberg REST service will refresh table metadata and update its pointer to the latest metadata state.
+7. If an update to table state is to be performed, spark writes out the new metadata relating to that table state, then notifies Iceberg REST catalog to attempt a commit.
+8. If this commit is successful, Iceberg REST catalog will refresh table metadata and update its pointer to the latest metadata state. If not, the onus is on spark to retry the commit.
 
 If you're interested in learning more, there are a couple of blogs that take a similar file-centric view of Iceberg queries[^7][^8]
 
