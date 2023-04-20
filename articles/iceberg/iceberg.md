@@ -37,7 +37,7 @@
       * [Event listeners](#event-listeners)
     * [Common to Both](#common-to-both)
       * [ACID transactions](#acid-transactions)
-    * [Time Travel/Version Rollback](#time-travelversion-rollback)
+      * [Time Travel/Version Rollback](#time-travelversion-rollback)
 * [Limitations](#limitations)
   * [Performance](#performance)
 * [Starting simple](#starting-simple)
@@ -59,7 +59,7 @@ Iceberg is not[^6]:
 * An execution engine
 * A service
 
-Other processing engines have their own out-of-tree integrations with Iceberg (AWS Glue, Presto, Trino, Impala). Snowflake have released support for Iceberg Tables as a open-standard alternative to their proprietary table format to [public preview](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
+Other processing engines have their own out-of-tree integrations with Iceberg (AWS Glue, Presto, Trino, Impala). Snowflake have released support for Iceberg Tables as an open-standard alternative to their proprietary table format to [public preview](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
 
 ## Licensing / pricing model
 
@@ -121,7 +121,7 @@ See [Storage Separation](#storage-separation) for more information on partition 
 
 > Tables will provide well-defined and dependable support for a core set of types.
 
-Iceberg fields can be of primitive type (type wrapper around commonly used Avro/Parquet/Orc primitive types), or can be of struct type (immutable tuple of fields, think of it as a typed dict with metadata around default value/nullability/comments). Iceberg has its own types and its own mappings between these types and the types of the underlying (Avro/Parquet/ORC) representation.
+Iceberg fields can be of primitive type (type wrapper around commonly used Avro/Parquet/Orc primitive types), or can be of struct type (immutable tuple of fields, think of it as a typed dictionary with metadata around default value/nullability/comments). Iceberg has its own types and its own mappings between these types and the types of the underlying (Avro/Parquet/ORC) representation.
 
 ### Storage Separation
 
@@ -167,38 +167,35 @@ The essential requirement for a catalog is that it must support atomic transacti
 
 Each non-native implementation has its own integration which wraps it, but regardless of the implementation, the role of the catalog service is to provide the single-source-of-truth for metadata state; managing namespaces, partitioning, and updates to table state.
 
-The REST is the only native implementation that does not require an external integration. At time of writing there is no service artefact produced for the REST catalog, only Java libraries which require wrapping in a web server (see [here](https://github.com/tabular-io/iceberg-rest-image/blob/master/src/main/java/org/apache/iceberg/rest/RESTCatalogServer.java) for an example. It feels like the REST catalog isn't really the recommended implementation, although that's never said explicitly, and that the expectation is to use one of the other catalog integrations.
-
+The REST is the only native implementation that does not require an external integration. At time of writing there is no service artefact produced for the REST catalog, only Java libraries which require wrapping in a web server (see [here](https://github.com/tabular-io/iceberg-rest-image/blob/master/src/main/java/org/apache/iceberg/rest/RESTCatalogServer.java) for an example). It feels like the REST catalog isn't really the recommended implementation, although that's never said explicitly, and that the expectation is to use one of the other catalog integrations.
 
 ### Iceberg Table Specification
 
 Iceberg was designed to run completely abstracted from physical storage using object storage. All locations are “explicit, immutable, and absolute” as defined in metadata
 
-Let's review the different metadata entities from the above diagram:
-[^6]
+Let's review the different metadata entities from the above diagram[^6]:
+
 #### Metadata file
 
-![Graphic highlighting metdata file and giving brief summary of its contents.](./metadataFile.png)
+![Graphic highlighting metadata file and giving brief summary of its contents.](./metadataFile.png)
 
-The metadata file (point 3 in the above diagram) is the single-source-of-truth for all metadata about the current table state. Whenever the state is mutated a new metadata file is written and the pointer within the Catalog swapped atomically. Among other things it contains a reference to the latest snaphot (point 4 in the above diagram) and the manifest list associated with that snapshot.
+The metadata file (point 3 in the above diagram) is the single-source-of-truth for all metadata about the current table state. Whenever the state is mutated a new metadata file is written and the pointer within the Catalog swapped atomically. Among other things it contains a reference to the latest snapshot (point 4 in the above diagram) and the manifest list associated with that snapshot.
 
 #### Snapshots
 
 Defines the state of the table at some point, including all data files, and paritions. Each snapshot is defined by a metadata file known as a manifest list.
 
-
 #### Manifest List
 
 ![Graphic highlighting manifest list file and giving brief summary of its contents.](./ManifestList.png)
 
-A manifest list file describes a snapshot, storing amongst other things references to the manifest files that each describe a subset of a snapshot. The manifest list containst summary stats about the row counts, data file counts, and partitions, but detailed information is stored in the manifest files.
+A manifest list file describes a snapshot, storing among other things references to the manifest files that each describe a subset of a snapshot. The manifest list contains summary stats about the row counts, data file counts, and partitions, but detailed information is stored in the manifest files.
 
 #### Manifest File
 
 ![Graphic highlighting manifest file and giving brief summary of its contents.](./manifestfile.png)
 
 The manifest file contains the references to the data files themselves, their format, and more detailed stats about each file, and the paritions that are applied to it.
-
 
 ## Integrations
 
@@ -258,7 +255,7 @@ Iceberg has a framework that allows other services to be notified when an event 
 
 Iceberg provides ACID transactionality is provided via the atomic metadata file swap, optimistic concurrency locking, isolation levels, and durable commit semantics.
 
-#### Time Travel/Version Rollback
+##### Time Travel/Version Rollback
 
 In Iceberg both data and metadata files are immutable, with any row level deletes being stored as separate files rather than overwriting the immutable data file. Any data updates will result in a new snapshot on commit. Any metadata updates are done with incremental ordering so state at any one moment in time is unambiguous. Time travel is possible to any point in time that has a snapshot associated, as that snapshot contains direct references to the immutable data files known to Iceberg (i.e. reflected in the table state) at that point in time.
 
@@ -279,7 +276,7 @@ docker-compose up
 ```
 
 This simple example gives us four services.
-* minio
+* MinIO
 * mc
 * spark-iceberg
 * rest
@@ -293,7 +290,7 @@ This simple example gives us four services.
 * A `spark` execution environment
 * The `iceberg-spark-runtime`
 
-As well as a URL connection client for accessing S3, AWS Cli, and vendor-specific spark runtime (I'm not sure this is included for any other reason than it's produced by the same company as this example).
+As well as a URL connection client for accessing S3, AWS CLI, and vendor-specific spark runtime (I'm not sure this is included for any other reason than it's produced by the same company as this example).
 
 This container is obviously doing way more than it should, but it's not a production example. It may be interesting to talk through exactly what it is doing though by running `docker-compose exec spark-iceberg ps -afuxww`
 
@@ -312,7 +309,7 @@ This container is obviously doing way more than it should, but it's not a produc
   * History Server
 * Running a Hive Thrift Server (presumably the catalog implementation)
 
-If we were to load a table from Iceberg using pyspark from an ipython notebook (e.g. `spark.table("demo.nyc.taxis")`, what would be happening?
+If we were to load a table from Iceberg using pyspark from an ipython notebook (e.g. `spark.table("demo.nyc.taxis")`), what would be happening?
 
 Let's work through it with the data we have in hand, that is the HTTP logs of the `minio` bucket (`docker-compose exec mc mc admin trace minio`)
 
