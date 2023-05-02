@@ -3,6 +3,7 @@
 ## Articles
 - [Prefect](/articles/prefect/prefect.md) (last reviewed Feb/2023)
 - [Data Lakehouse Architecture](/articles/data_lakehouse_architecture/data_lakehouse_architecture.md)  (last reviewed Feb/2023)
+- [DuckDB](/articles/duckdb/duckdb.md)  (last reviewed May/2023)
 
 ## Quick Exploration Packs
 These are repos with instructions to easily explore the tools.
