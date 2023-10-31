@@ -2,6 +2,7 @@
 
 ## Articles
 - [Prefect](/articles/prefect/prefect.md) (last reviewed Feb/2023)
+- [Apache Iceberg](/articles/iceberg/iceberg.md) (last reviewed Apr/2023)
 - [Data Lakehouse Architecture](/articles/data_lakehouse_architecture/data_lakehouse_architecture.md)  (last reviewed Feb/2023)
 - [DuckDB](/articles/duckdb/duckdb.md)  (last reviewed May/2023)
 
@@ -12,6 +13,7 @@ These are repos with instructions to easily explore the tools.
 
 - [Prefect: toy single container example](https://github.com/madetech/prefect_exploration_toy_example)
 - [Prefect: multi-container example](https://github.com/fraibacas/prefect-orion)
+- [Iceberg: proof-of-concept with Apache Spark & Jupyter frontend](https://github.com/tabular-io/docker-spark-iceberg)
 
 ## Collaborating
 - For each Tech Review article a subfolder should be created inside the /articles folder (e.g. /articles/prefect).
