@@ -3,6 +3,7 @@
 ## Articles
 - [Prefect](/articles/prefect/prefect.md) (last reviewed Feb/2023)
 - [Apache Iceberg](/articles/iceberg/iceberg.md) (last reviewed Apr/2023)
+- [Apache Kafka](/articles/kafka/kafka.md) (last reviewed Dec/2023)
 - [Data Lakehouse Architecture](/articles/data_lakehouse_architecture/data_lakehouse_architecture.md)  (last reviewed Feb/2023)
 - [DuckDB](/articles/duckdb/duckdb.md)  (last reviewed May/2023)
 
