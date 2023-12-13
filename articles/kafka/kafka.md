@@ -17,7 +17,8 @@
 ## Brief Description
 Apache Kafka is an open-source stream-processing software platform developed by the Apache Software Foundation, written in Scala and Java. It is a framework for storing, reading, and analyzing streaming data. Originally designed for tracking service calls and operational metrics at LinkedIn, Kafka has evolved into a full-fledged event streaming platform, fundamentally changing how companies process and leverage real-time data.
 
-![Kafka architecture overview.](./overview.png)
+<img src="./overview.png" alt="drawing" class="center" width="400" />
+
 
 ## Goals
 The primary goals of Apache Kafka are:
@@ -45,24 +46,24 @@ Kafka consists of several key components:
 
 4. **Partition:** Topics may be divided into partitions for better scalability and parallel processing. Partitions allow messages to be parallelized by splitting the data across multiple brokers.
 
-![Kafka producer.](./producer.png)
-
-5. **Consumer:** Consumers read data from the brokers. They subscribe to one or more Kafka topics and process the data stream.
-
-![Kafka consumer.](./consumer.png)
+<img src="./producer.png" alt="drawing" class="center" width="500" />
 
 
-6. **Zookeeper:** Zookeeper is used to manage and coordinate the Kafka brokers. It is a consistent service for distributed systems that is used for maintaining configuration information, naming, providing distributed synchronization, and group services.
+1. **Consumer:** Consumers read data from the brokers. They subscribe to one or more Kafka topics and process the data stream.
 
-![Kafka Zookeeper.](./zookeeper.png)
+<img src="./consumer.png" alt="drawing" class="center" width="500" />
 
+
+1. **Zookeeper:** Zookeeper is used to manage and coordinate the Kafka brokers. It is a consistent service for distributed systems that is used for maintaining configuration information, naming, providing distributed synchronization, and group services.
+
+<img src="./zookeeper.png" alt="drawing" class="center" width="500" />
 
 #### Kafka's Architecture
 Kafka's architecture is built around a distributed commit log. Here's how it works:
 
 1. **Producers push data to topics:** Producers create messages that are then pushed to Kafka topics. Each message consists of a key, a value, and a timestamp.
 
-<img src="./message.png" alt="drawing" class="center" width="400" />
+<img src="./message.png" alt="drawing" class="center" width="500" />
 
 1. **Logs and partitions:** Kafka topics are divided into a number of partitions, which contain logs. Each log is an ordered set of records. Partitioning allows Kafka to scale and supports multiple consumers by dividing the data across brokers.
 
