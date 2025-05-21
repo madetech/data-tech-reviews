@@ -74,7 +74,7 @@ Originally developed by Netflix, released to the public domain in 2017, donated 
 
 ### Open Format Specification
 
-Version 1 and 2 of the format specification have been completed and adopted by the community. The two releases see to be additive in scope.
+Version 1 and 2 of the format specification have been completed and adopted by the community. The two releases see to be additive in scope. A third version is under development.
 
 ### Java Libraries
 
@@ -82,7 +82,7 @@ Apache Iceberg v1.0 was released in November 2022.
 
 ### Pyiceberg
 
-Pyiceberg is versioned separately despite being part of the Iceberg git repository, and is yet to have a major release (version 0.13 at time of writing).
+Pyiceberg is maintained in a separate git repository, and is yet to have a major release (version 0.9.1 at time of writing).
 
 ## What Are the Goals of Iceberg?
 
