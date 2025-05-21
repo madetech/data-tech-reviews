@@ -10,8 +10,7 @@
   * [Pyiceberg](#pyiceberg)
 * [What Are the Goals of Iceberg?](#what-are-the-goals-of-iceberg)
   * [Serializable isolation](#serializable-isolation)
-  * [Speed](#speed)
-  * [Scale](#scale)
+  * [Speed](#speed-and-scale)
   * [Evolution](#evolution)
   * [Dependable Types](#dependable-types)
   * [Storage Separation](#storage-separation)
@@ -103,17 +102,15 @@ The success of concurrent write operations also depends on the isolation level i
 
 > “While serializable is the strongest isolation level in databases, snapshot isolation is beneficial for environments with many concurrent writers. The serializable isolation level guarantees that an ongoing UPDATE/DELETE/MERGE operation fails if a concurrent transaction commits a new file that might contain rows matching the condition used in UPDATE/DELETE/MERGE. For example, if there is an ongoing update on a subset of rows and a concurrent transaction adds a new file with records that potentially match the update condition, the update operation must fail under the serializable isolation but can still commit under the snapshot isolation.”
 
-### Speed
+### Speed and Scale
 
 > Operations will use O(1) remote calls to plan the files for a scan and not O(n) where n grows with the size of the table, like the number of partitions or files.
 
-The metadata files I mentioned earlier contain all metadata relating to the table schema, partitioning config, custom properties, and snapshots (i.e. table states) of the table contents. This means that a single source of truth is maintained for query planning.
-
-### Scale
-
 > Job planning will be handled primarily by clients and not bottleneck on a central metadata store. Metadata will include information needed for cost-based optimization.
 
-This point is already mostly covered with what I've said above; the metadata required for query planning is referenced by a pointer to a metadata file in the object store, the onus is on clients to use this for query planning before submission of the query to whatever distributed compute is available.
+A table's metadata files contain all metadata relating to the table schema, partitioning config, custom properties, and snapshots (i.e. table states) of the table contents. This means that engines can use the metadata alone for query planning, without scanning data files.
+
+The practical maximum size of data in Iceberg isn't clear, but it's large. It seems to be bounded by the storage platform and query engine rather than the format itself.
 
 ### Evolution
 
