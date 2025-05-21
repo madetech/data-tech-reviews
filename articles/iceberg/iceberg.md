@@ -90,13 +90,17 @@ Pyiceberg is maintained in a separate git repository, and is yet to have a major
 
 > Reads will be isolated from concurrent writes and always use a committed snapshot of a table’s data. Writes will support removing and adding files in a single operation and are never partially visible. Readers will not acquire locks.
 
-Essentially what this means in practice is that, Iceberg supports writes to (immutable) files in the directory structure of the data layer without the contents being registered in the table entity. Iceberg terms this Optimistic Concurrency; any table data or metadata is created optimistically assuming that the current "version" will not be changed before that write is committed. In the case of multiple concurrent writes, the first to win the race succeeds, all others have to be retried.
+ Iceberg writes data using a strategy it calls **Optimistic Concurrency**: any table data or metadata is written assuming that the current "version" of the table will not change before that write is committed. In the case of multiple concurrent writes, the first to win the race succeeds, and all others have to be retried.
 
-When the write is committed, the table state is changed (i.e. the new data files previously written are registered against the tables) a new (immutable) metadata file is created, and the pointer held by the catalog service is swapped atomically.
+When a write is committed:
+1. A new immutable data file is written in the directory structure of the data layer.
+2. New immutable metadata files are created which register the new data file as part of the table.
+3. The pointer held by the catalog service is updated to point to the new metadata file.
+*Note that data can be freely written to the data layer without affecting the table. Until a file is registered by the metadata files which define the table it is ignored.*
 
 > An atomic swap of one table metadata file for another provides the basis for serializable isolation. Readers use the snapshot that was current when they load the table metadata and are not affected by changes until they refresh and pick up a new metadata location.
 
-If the metadata (or specifically the list of snapshots, see the next section for more detail) is no longer concurrent (i.e. does not have the same state as the one fetched when the write began) at point of commit, the writer process must recalculate the new metadata state against the current version, and try to commit this change again. How difficult this is depends on the change being written, and the isolation level which it requires, and is out of scope of this article.
+If the table's metadata changes while a write is taking place, the writer process must try to commit its change again, recalculating the new state from the new current version. How difficult this is depends on the change being written, and the isolation level which it requires, and is out of scope of this article.
 
 The success of concurrent write operations also depends on the isolation level in a table. Apache Iceberg supports two isolation levels: serializable and snapshot. By default, the isolation level is serializable but can be changed to snapshot.
 
@@ -116,7 +120,7 @@ The practical maximum size of data in Iceberg isn't clear, but it's large. It se
 
 > Tables will support full schema and partition spec evolution. Schema evolution supports safe column add, drop, reorder and rename, including in nested structures.
 
-Schema in this context is the table schema, the names and types of field stored in a table. Importantly, the relationship between tables and schemas is one-to-many, i.e. a table is described by an iterable of schemas. When a new schema is added, this evolution process copies the previous schema, applies the changes, and adds this (immutable) schema to the list of schemas recorded against the table. This gives a full history of how the table structure has evolved over time.
+Schema in this context is the table schema: the names and types of field stored in a table. In Iceberg tables, schemas are recorded in an append-only list in the table's metadata. This gives a full history of how the table structure has evolved over time. When a table's schema is updated by a user (for example when a column is created or renamed), the table's new schema is generated, *appended* to the table's schema list and marked as active. This is used primarily for [Time Travel/Version Rollback](#time-travelversion-rollback).
 
 See [Storage Separation](#storage-separation) for more information on partition evolution.
 
@@ -148,7 +152,10 @@ Iceberg operates on top of a distributed file system with data (Avro, Parquet & 
 
 We can characterize the position of Iceberg within a data engineering stack with the following graphic ![Graphic detailing target architecture of Iceberg.](./StarburstIcebergAnimation.gif)
 
-Starting from the top, a job is planned within some compute engine that requires data in iceberg, the compute then queries iceberg catalog via the relevant adapter, uses current metadata to plan and execute against the relevant data files provided.
+Starting from the top:
+1. A job is planned within some compute engine that requires data in Iceberg
+2. the compute then queries iceberg catalog via the relevant adapter and recieves the table metadata
+3. the engine uses the current metadata to plan and execute against the relevant data files for the table and query
 
 Going down a level, we can see in the following graphic how this planning process goes from table-space to a list of references to relevant data files. ![Graphic detailing target architecture of Iceberg.](./DellIcebergGraphic.png)
 
@@ -213,7 +220,7 @@ Iceberg features full support for the following spark APIs:
 
 #### Structured streaming
 
-Iceberg supports both reading and writing Dataframes using Sparks native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables. These streams are processed as microbatches similar to Databricks closed-source implementation.
+Iceberg supports both reading and writing data using Spark's native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables. These streams are processed as microbatches similar to Databricks' closed-source implementation.
 
 #### Catalog
 
@@ -240,7 +247,7 @@ There is a considerable difference in maturity between Iceberg and Delta. Arguab
 
 ##### Concurrent Writes to Same Table
 
-Iceberg supports concurrent writes to the same Delta table from multiple spark drivers natively, whereas Delta requires a [workaround using DynamoDB and explicit feature/version toggle on all LogStore writers](https://docs.delta.io/latest/delta-storage.html#-delta-storage-s3-multi-cluster)
+Iceberg supports concurrent writes to the same table from multiple Spark drivers natively, whereas Delta requires a [workaround using DynamoDB and explicit feature/version toggle on all LogStore writers](https://docs.delta.io/latest/delta-storage.html#-delta-storage-s3-multi-cluster)
 
 ##### Partition Layout Evolution
 
