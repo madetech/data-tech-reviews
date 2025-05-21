@@ -47,19 +47,25 @@
 
 ## Brief description
 
-> Iceberg is a high-performance format for huge analytic tables. Iceberg brings the reliability and simplicity of SQL tables to big data, while making it possible for engines like Spark, Trino, Flink, Presto, Hive and Impala to safely work with the same tables, at the same time.
+Apache Iceberg is a file-format specification for storing database tables and querying their metadata which is compatible with cloud blob stores like AWS S3. The [official website](https://iceberg.apache.org/) describes it like this:
 
-Essentially Iceberg has three components, all versioned separately:
-* Open format specification[^1] for a table level persistence store
-* Java API Layer & Reference implementation for interacting with the format specification, and integrating with processing engines (in-tree: Spark, Flink & Hive)
-* Python API layer & CLI to interact with the Catalog server (or its Glue/Hive/DynamoDB equivalent (?)), and direct querying of the metadata/data layers
+>  Iceberg is a high-performance format for huge analytic tables. Iceberg brings the reliability and simplicity of SQL tables to big data, while making it possible for engines like Spark, Trino, Flink, Presto, Hive and Impala to safely work with the same tables, at the same time.
+
+Iceberg has two main components:
+* Open format specification[^1] for a table-level persistence store
+* Open API specification for querying table metadata
+
+> [!INFO] The Specification
+> The [specification for Iceberg](https://iceberg.apache.org/spec/) is the source of truth for what Iceberg is and does. Reading through it is highly recommended. It's written in an approachable style and covers anything you might need to know.
+
+The specification comes with reference implementations in Java[^13] and Python[^14] which allow interacting with the format specification and integrating with processing engines. The Java implementation includes integrations with Spark and Flink, amongst others.
 
 Iceberg is not[^6]:
-* A storage engine
+* A database engine
 * An execution engine
 * A service
 
-Other processing engines have their own out-of-tree integrations with Iceberg (AWS Glue, Presto, Trino, Impala). Snowflake have released support for Iceberg Tables as an open-standard alternative to their proprietary table format to [public preview](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
+Other processing engines have their own out-of-tree integrations with Iceberg (AWS Glue, Presto, Trino, Impala). Snowflake also supports Iceberg Tables as an open-standard alternative to its proprietary table format.[^11][^12]
 
 ## Licensing / pricing model
 
@@ -340,3 +346,7 @@ Iceberg documents a potential production setup using [AWS](https://github.com/ap
 
 [^9]: [2022 Delta vs Iceberg Benchmarking](https://databeans-blogs.medium.com/delta-vs-iceberg-performance-as-a-decisive-criteria-add7bcdde03d)
 [^10]: [2023 Delta vs Iceberg vs Hudi Benchmarking](https://www.onehouse.ai/blog/apache-hudi-vs-delta-lake-vs-apache-iceberg-lakehouse-feature-comparison)
+[^11]: [Iceberg generally available in Snowflake](https://www.snowflake.com/en/blog/storage-iceberg-tables-now-generally-available/)
+[^12]: [Iceberg tables in Snowflake](https://docs.snowflake.com/en/user-guide/tables-iceberg)
+[^13]: [Iceberg in GitHub](https://github.com/apache/iceberg)
+[^14]: [Iceberg Python implementation](https://github.com/apache/iceberg-python)
