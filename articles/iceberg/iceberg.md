@@ -270,7 +270,7 @@ As of 2022, Iceberg is being outperformed by Delta in the TPC-DS benchmark. Thes
 ## Starting simple
 
 ```shell
-git clone https://github.com/apache/iceberg.git
+git clone https://github.com/databricks/docker-spark-iceberg
 cd docker-spark-iceberg
 docker-compose up
 ```
@@ -326,7 +326,7 @@ If you're interested in learning more, there are a couple of blogs that take a s
 
 ## Scalable Production
 
-Iceberg documents a potential production setup using [AWS](https://github.com/apache/iceberg/blob/master/docs/aws.md)
+Iceberg documents a potential production setup using [AWS](https://github.com/apache/iceberg/blob/main/docs/docs/aws.md)
 
 [^1]: [Apache Iceberg Spec](https://iceberg.apache.org/spec/)
 
