@@ -10,8 +10,7 @@
   * [Pyiceberg](#pyiceberg)
 * [What Are the Goals of Iceberg?](#what-are-the-goals-of-iceberg)
   * [Serializable isolation](#serializable-isolation)
-  * [Speed](#speed)
-  * [Scale](#scale)
+  * [Speed](#speed-and-scale)
   * [Evolution](#evolution)
   * [Dependable Types](#dependable-types)
   * [Storage Separation](#storage-separation)
@@ -47,19 +46,25 @@
 
 ## Brief description
 
-> Iceberg is a high-performance format for huge analytic tables. Iceberg brings the reliability and simplicity of SQL tables to big data, while making it possible for engines like Spark, Trino, Flink, Presto, Hive and Impala to safely work with the same tables, at the same time.
+Apache Iceberg is a file-format specification for storing database tables and querying their metadata which is compatible with cloud blob stores like AWS S3. The [official website](https://iceberg.apache.org/) describes it like this:
 
-Essentially Iceberg has three components, all versioned separately:
-* Open format specification[^1] for a table level persistence store
-* Java API Layer & Reference implementation for interacting with the format specification, and integrating with processing engines (in-tree: Spark, Flink & Hive)
-* Python API layer & CLI to interact with the Catalog server (or its Glue/Hive/DynamoDB equivalent (?)), and direct querying of the metadata/data layers
+>  Iceberg is a high-performance format for huge analytic tables. Iceberg brings the reliability and simplicity of SQL tables to big data, while making it possible for engines like Spark, Trino, Flink, Presto, Hive and Impala to safely work with the same tables, at the same time.
+
+Iceberg has two main components:
+* Open format specification[^1] for a table-level persistence store
+* Open API specification for querying table metadata
+
+> [!INFO] The Specification
+> The [specification for Iceberg](https://iceberg.apache.org/spec/) is the source of truth for what Iceberg is and does. Reading through it is highly recommended. It's written in an approachable style and covers anything you might need to know.
+
+The specification comes with reference implementations in Java[^13] and Python[^14] which allow interacting with the format specification and integrating with processing engines. The Java implementation includes integrations with Spark and Flink, amongst others.
 
 Iceberg is not[^6]:
-* A storage engine
+* A database engine
 * An execution engine
 * A service
 
-Other processing engines have their own out-of-tree integrations with Iceberg (AWS Glue, Presto, Trino, Impala). Snowflake have released support for Iceberg Tables as an open-standard alternative to their proprietary table format to [public preview](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
+Other processing engines have their own out-of-tree integrations with Iceberg (AWS Glue, Presto, Trino, Impala). Snowflake also supports Iceberg Tables as an open-standard alternative to its proprietary table format.[^11][^12]
 
 ## Licensing / pricing model
 
@@ -69,7 +74,7 @@ Originally developed by Netflix, released to the public domain in 2017, donated 
 
 ### Open Format Specification
 
-Version 1 and 2 of the format specification have been completed and adopted by the community. The two releases see to be additive in scope.
+Version 1 and 2 of the format specification have been completed and adopted by the community. The two releases see to be additive in scope. A third version is under development.
 
 ### Java Libraries
 
@@ -77,7 +82,7 @@ Apache Iceberg v1.0 was released in November 2022.
 
 ### Pyiceberg
 
-Pyiceberg is versioned separately despite being part of the Iceberg git repository, and is yet to have a major release (version 0.13 at time of writing).
+Pyiceberg is maintained in a separate git repository, and is yet to have a major release (version 0.9.1 at time of writing).
 
 ## What Are the Goals of Iceberg?
 
@@ -85,35 +90,37 @@ Pyiceberg is versioned separately despite being part of the Iceberg git reposito
 
 > Reads will be isolated from concurrent writes and always use a committed snapshot of a table’s data. Writes will support removing and adding files in a single operation and are never partially visible. Readers will not acquire locks.
 
-Essentially what this means in practice is that, Iceberg supports writes to (immutable) files in the directory structure of the data layer without the contents being registered in the table entity. Iceberg terms this Optimistic Concurrency; any table data or metadata is created optimistically assuming that the current "version" will not be changed before that write is committed. In the case of multiple concurrent writes, the first to win the race succeeds, all others have to be retried.
+ Iceberg writes data using a strategy it calls **Optimistic Concurrency**: any table data or metadata is written assuming that the current "version" of the table will not change before that write is committed. In the case of multiple concurrent writes, the first to win the race succeeds, and all others have to be retried.
 
-When the write is committed, the table state is changed (i.e. the new data files previously written are registered against the tables) a new (immutable) metadata file is created, and the pointer held by the catalog service is swapped atomically.
+When a write is committed:
+1. A new immutable data file is written in the directory structure of the data layer.
+2. New immutable metadata files are created which register the new data file as part of the table.
+3. The pointer held by the catalog service is updated to point to the new metadata file.
+*Note that data can be freely written to the data layer without affecting the table. Until a file is registered by the metadata files which define the table it is ignored.*
 
 > An atomic swap of one table metadata file for another provides the basis for serializable isolation. Readers use the snapshot that was current when they load the table metadata and are not affected by changes until they refresh and pick up a new metadata location.
 
-If the metadata (or specifically the list of snapshots, see the next section for more detail) is no longer concurrent (i.e. does not have the same state as the one fetched when the write began) at point of commit, the writer process must recalculate the new metadata state against the current version, and try to commit this change again. How difficult this is depends on the change being written, and the isolation level which it requires, and is out of scope of this article.
+If the table's metadata changes while a write is taking place, the writer process must try to commit its change again, recalculating the new state from the new current version. How difficult this is depends on the change being written, and the isolation level which it requires, and is out of scope of this article.
 
 The success of concurrent write operations also depends on the isolation level in a table. Apache Iceberg supports two isolation levels: serializable and snapshot. By default, the isolation level is serializable but can be changed to snapshot.
 
 > “While serializable is the strongest isolation level in databases, snapshot isolation is beneficial for environments with many concurrent writers. The serializable isolation level guarantees that an ongoing UPDATE/DELETE/MERGE operation fails if a concurrent transaction commits a new file that might contain rows matching the condition used in UPDATE/DELETE/MERGE. For example, if there is an ongoing update on a subset of rows and a concurrent transaction adds a new file with records that potentially match the update condition, the update operation must fail under the serializable isolation but can still commit under the snapshot isolation.”
 
-### Speed
+### Speed and Scale
 
 > Operations will use O(1) remote calls to plan the files for a scan and not O(n) where n grows with the size of the table, like the number of partitions or files.
 
-The metadata files I mentioned earlier contain all metadata relating to the table schema, partitioning config, custom properties, and snapshots (i.e. table states) of the table contents. This means that a single source of truth is maintained for query planning.
-
-### Scale
-
 > Job planning will be handled primarily by clients and not bottleneck on a central metadata store. Metadata will include information needed for cost-based optimization.
 
-This point is already mostly covered with what I've said above; the metadata required for query planning is referenced by a pointer to a metadata file in the object store, the onus is on clients to use this for query planning before submission of the query to whatever distributed compute is available.
+A table's metadata files contain all metadata relating to the table schema, partitioning config, custom properties, and snapshots (i.e. table states) of the table contents. This means that engines can use the metadata alone for query planning, without scanning data files.
+
+The practical maximum size of data in Iceberg isn't clear, but it's large. It seems to be bounded by the storage platform and query engine rather than the format itself.
 
 ### Evolution
 
 > Tables will support full schema and partition spec evolution. Schema evolution supports safe column add, drop, reorder and rename, including in nested structures.
 
-Schema in this context is the table schema, the names and types of field stored in a table. Importantly, the relationship between tables and schemas is one-to-many, i.e. a table is described by an iterable of schemas. When a new schema is added, this evolution process copies the previous schema, applies the changes, and adds this (immutable) schema to the list of schemas recorded against the table. This gives a full history of how the table structure has evolved over time.
+Schema in this context is the table schema: the names and types of field stored in a table. In Iceberg tables, schemas are recorded in an append-only list in the table's metadata. This gives a full history of how the table structure has evolved over time. When a table's schema is updated by a user (for example when a column is created or renamed), the table's new schema is generated, *appended* to the table's schema list and marked as active. This is used primarily for [Time Travel/Version Rollback](#time-travelversion-rollback).
 
 See [Storage Separation](#storage-separation) for more information on partition evolution.
 
@@ -145,7 +152,10 @@ Iceberg operates on top of a distributed file system with data (Avro, Parquet & 
 
 We can characterize the position of Iceberg within a data engineering stack with the following graphic ![Graphic detailing target architecture of Iceberg.](./StarburstIcebergAnimation.gif)
 
-Starting from the top, a job is planned within some compute engine that requires data in iceberg, the compute then queries iceberg catalog via the relevant adapter, uses current metadata to plan and execute against the relevant data files provided.
+Starting from the top:
+1. A job is planned within some compute engine that requires data in Iceberg
+2. the compute then queries iceberg catalog via the relevant adapter and recieves the table metadata
+3. the engine uses the current metadata to plan and execute against the relevant data files for the table and query
 
 Going down a level, we can see in the following graphic how this planning process goes from table-space to a list of references to relevant data files. ![Graphic detailing target architecture of Iceberg.](./DellIcebergGraphic.png)
 
@@ -210,7 +220,7 @@ Iceberg features full support for the following spark APIs:
 
 #### Structured streaming
 
-Iceberg supports both reading and writing Dataframes using Sparks native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables. These streams are processed as microbatches similar to Databricks closed-source implementation.
+Iceberg supports both reading and writing data using Spark's native structured streaming API (`spark.readStream` and `spark.writeStream`) in analogy to Delta Live Tables. However, Iceberg doesn't yet include any explicit orchestration functionality for managing the resulting live tables. These streams are processed as microbatches similar to Databricks' closed-source implementation.
 
 #### Catalog
 
@@ -237,7 +247,7 @@ There is a considerable difference in maturity between Iceberg and Delta. Arguab
 
 ##### Concurrent Writes to Same Table
 
-Iceberg supports concurrent writes to the same Delta table from multiple spark drivers natively, whereas Delta requires a [workaround using DynamoDB and explicit feature/version toggle on all LogStore writers](https://docs.delta.io/latest/delta-storage.html#-delta-storage-s3-multi-cluster)
+Iceberg supports concurrent writes to the same table from multiple Spark drivers natively, whereas Delta requires a [workaround using DynamoDB and explicit feature/version toggle on all LogStore writers](https://docs.delta.io/latest/delta-storage.html#-delta-storage-s3-multi-cluster)
 
 ##### Partition Layout Evolution
 
@@ -270,7 +280,7 @@ As of 2022, Iceberg is being outperformed by Delta in the TPC-DS benchmark. Thes
 ## Starting simple
 
 ```shell
-git clone https://github.com/apache/iceberg.git
+git clone https://github.com/databricks/docker-spark-iceberg
 cd docker-spark-iceberg
 docker-compose up
 ```
@@ -326,7 +336,7 @@ If you're interested in learning more, there are a couple of blogs that take a s
 
 ## Scalable Production
 
-Iceberg documents a potential production setup using [AWS](https://github.com/apache/iceberg/blob/master/docs/aws.md)
+Iceberg documents a potential production setup using [AWS](https://github.com/apache/iceberg/blob/main/docs/docs/aws.md)
 
 [^1]: [Apache Iceberg Spec](https://iceberg.apache.org/spec/)
 
@@ -340,3 +350,7 @@ Iceberg documents a potential production setup using [AWS](https://github.com/ap
 
 [^9]: [2022 Delta vs Iceberg Benchmarking](https://databeans-blogs.medium.com/delta-vs-iceberg-performance-as-a-decisive-criteria-add7bcdde03d)
 [^10]: [2023 Delta vs Iceberg vs Hudi Benchmarking](https://www.onehouse.ai/blog/apache-hudi-vs-delta-lake-vs-apache-iceberg-lakehouse-feature-comparison)
+[^11]: [Iceberg generally available in Snowflake](https://www.snowflake.com/en/blog/storage-iceberg-tables-now-generally-available/)
+[^12]: [Iceberg tables in Snowflake](https://docs.snowflake.com/en/user-guide/tables-iceberg)
+[^13]: [Iceberg in GitHub](https://github.com/apache/iceberg)
+[^14]: [Iceberg Python implementation](https://github.com/apache/iceberg-python)
